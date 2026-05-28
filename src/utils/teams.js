@@ -1,6 +1,7 @@
-const TEAMS_WEBHOOK_URL = "https://default8c308e1514804168aed7b0f7a13520.95.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/81d2242fc7604e0da980e0a536facf6e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=KRZ0RER4POavOBuEFKdMTghSx2z5SpPqenVycAgnq34";
+const TEAMS_WEBHOOK_URL = import.meta.env.VITE_TEAMS_WEBHOOK_URL || '';
 
 export const sendTeamsNotification = async (title, details, imageUrls = []) => {
+  if (!TEAMS_WEBHOOK_URL) return;
   try {
     const facts = Object.entries(details).map(([title, value]) => ({ title, value }));
 
