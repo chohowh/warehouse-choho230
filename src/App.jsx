@@ -702,40 +702,11 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
           <h2 style={{ margin: 0, fontSize: isMobile ? 16 : 22, fontWeight: 900 }}>{lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
         </div>
-        {isMobile && (
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "8px 0 4px", scrollbarWidth: "none" }}>
-            {stats.map(s => (
-              <div key={s.label} style={{ flexShrink: 0, background: "#fff", borderRadius: 12, padding: "10px 14px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", borderLeft: `4px solid ${s.color}`, minWidth: 90 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3, whiteSpace: "nowrap" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {isMobile ? (
-        /* Mobile: full width truck cards */
-        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", marginTop: 8 }}>
-          <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} />
-        </div>
-      ) : (
-        /* Desktop: sidebar + table */
-        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 12, alignItems: "start" }}>
-          <div style={{ position: "sticky", top: 100, alignSelf: "start", display: "flex", flexDirection: "column", gap: 10 }}>
-            {stats.map(s => (
-              <div key={s.label} style={{ background: "#fff", borderRadius: 12, padding: "12px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${s.color}` }}>
-                <div style={{ color: s.color, marginBottom: 3 }}><Icon name={s.icon} size={16} /></div>
-                <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: "#6b7280", marginTop: 3 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", minWidth: 0 }}>
-            <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} />
-          </div>
-        </div>
-      )}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", marginTop: 8 }}>
+        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} />
+      </div>
     </div>
   );
 };
