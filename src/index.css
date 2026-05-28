@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+* {
+  font-family: 'Sarabun', sans-serif;
+}
+
 @keyframes blink-urgent {
   0%, 100% { background-color: #fff; }
   50%       { background-color: #fee2e2; }
@@ -10,4 +14,8 @@
 
 @media (max-width: 768px) {
   .desktop-only { display: none !important; }
+  .mobile-only  { display: block !important; }
+}
+@media (min-width: 769px) {
+  .mobile-only  { display: none !important; }
 }

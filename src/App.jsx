@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
 import { sendTeamsNotification } from "./utils/teams";
@@ -363,18 +363,14 @@ const TimeBar = ({ exitTime, date, done, invoicedAt }) => {
     );
   }
 
-  const pct = Math.min(Math.max(remaining / totalWindow, 0), 1);
   const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
   const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
+  const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
   return (
-    <div style={{ minWidth: 160 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap" }}>{exitTime}</span>
-        <div style={{ flex: 1, background: "#e5e7eb", borderRadius: 6, height: 10, overflow: "hidden", minWidth: 60 }}>
-          <div style={{ background: color, height: "100%", width: `${pct * 100}%`, borderRadius: 6 }} />
-        </div>
-      </div>
-      <div style={{ fontSize: 11, color, marginTop: 4, whiteSpace: "nowrap", fontWeight: 600 }}>{label}</div>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
+      <div style={{ fontSize: 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
+      <div style={{ marginTop: 4, height: 6, borderRadius: 0, marginLeft: -114, width: "calc(100% + 114px)", background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
 };
@@ -486,8 +482,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
       <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#f1f5f9", paddingBottom: 8, paddingTop: 0 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>📊 {lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
-            <span style={{ fontSize: 22, fontWeight: 900, color: "#374151" }}>{TODAY} <span style={{ color: "#3b82f6", fontVariantNumeric: "tabular-nums" }}>{clock}</span></span>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
           </div>
         </div>
       </div>
@@ -513,7 +508,41 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
           </div>
           {allRows.length === 0
             ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>ยังไม่มีรถเข้าโรงงาน</div>
-            : <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 170px)" }}>
+            : <>
+              {/* Mobile cards */}
+              <div className="mobile-only" style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {allRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
+                  const rem = getRemMins({ date, exitTime });
+                  const color = rem <= 0 ? "#ef4444" : rem <= 20 ? "#ef4444" : rem <= 60 ? "#f59e0b" : "#22c55e";
+                  const pct = Math.min(Math.max(rem / 240, 0), 1) * 100;
+                  const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
+                  const label = rem < 0 ? `เกิน ${fmtMins(rem)} ชม.` : `เหลือ ${fmtMins(rem)} ชม.`;
+                  const statusLabel = !truck ? "รอเช็คอิน" : truck.status === "invoiced" ? "Invoice แล้ว" : truck.status === "summary_printed" ? "โหลดเสร็จ" : truck.status === "picking" ? "กำลังโหลด" : truck.status === "arrived" ? "รอเข้าโหลด" : "รอเช็คอิน";
+                  const statusColor = !truck ? "#9ca3af" : truck.status === "invoiced" ? "#6b7280" : truck.status === "picking" ? "#f97316" : truck.status === "arrived" ? "#3b82f6" : "#9ca3af";
+                  return (
+                    <div key={key} style={{ background: "#f9fafb", borderRadius: 10, padding: "10px 12px", borderLeft: `4px solid ${color}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 900, fontSize: 15 }}>{plate}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{statusLabel}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{customerGroup}</div>
+                      <div style={{ display: "flex", gap: 12, fontSize: 12, marginBottom: 6 }}>
+                        <div><span style={{ color: "#9ca3af" }}>เข้า </span><span style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</span></div>
+                        <div><span style={{ color: "#9ca3af" }}>ออก </span><span style={{ fontWeight: 700, color: rem <= 0 ? "#ef4444" : "#374151" }}>{exitTime || "—"}</span></div>
+                        {exitTime && <div style={{ fontWeight: 700, color, fontSize: 11 }}>{label}</div>}
+                      </div>
+                      {exitTime && <div style={{ height: 4, borderRadius: 0, background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />}
+                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                        <span style={{ fontSize: 10, color: truck?.pickupPrinted ? "#10b981" : "#d1d5db", fontWeight: 700 }}>ใบเบิก{truck?.pickupPrinted ? "✓" : "–"}</span>
+                        <span style={{ fontSize: 10, color: truck?.summaryPrinted ? "#10b981" : "#d1d5db", fontWeight: 700 }}>ใบสรุป{truck?.summaryPrinted ? "✓" : "–"}</span>
+                        <span style={{ fontSize: 10, color: truck?.status === "invoiced" ? "#10b981" : "#d1d5db", fontWeight: 700 }}>Invoice{truck?.status === "invoiced" ? "✓" : "–"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Desktop table */}
+              <div className="desktop-only" style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 170px)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                     <tr style={{ background: "#f9fafb" }}>
@@ -530,13 +559,13 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
                       <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
                         <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
                         <td style={{ padding: "10px 12px", color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>
-                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                          <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                          <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 13, lineHeight: "18px" }}>{entryTime || "—"}</div>
                           {truck?.arrivedAt
-                            ? <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
-                            : <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
+                            ? <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>เข้าจริง {truck.arrivedAt}</div>
+                            : <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>(รถยังไม่เข้าโรงงาน)</div>}
                         </td>
-                        <td style={{ padding: "10px 12px" }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} /></td>
+                        <td style={{ padding: "10px 12px", verticalAlign: "top" }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} /></td>
                         <td style={{ padding: "10px 12px" }}>
                           {!truck
                             ? <span style={{ fontSize: 11, color: "#9ca3af" }}>รอเช็คอิน</span>
@@ -584,6 +613,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
                   </tbody>
                 </table>
               </div>
+            </>
           }
         </div>
       </div>
@@ -1977,11 +2007,13 @@ export default function App() {
   const [dashLane,   setDashLane]   = useState("main");
   const [time,       setTime]       = useState(TIME_NOW());
   const [loading,    setLoading]    = useState(true);
+  const [headerClock, setHeaderClock] = useState(() => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 
   // Driver-only mode via URL parameter ?mode=driver
   const isDriverMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "driver";
 
   useEffect(() => { const id = setInterval(() => setTime(TIME_NOW()), 15000); return () => clearInterval(id); }, []);
+  useEffect(() => { const id = setInterval(() => setHeaderClock(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })), 1000); return () => clearInterval(id); }, []);
 
   useEffect(() => {
     fetchQueue().then(setQueue);
@@ -2050,14 +2082,16 @@ export default function App() {
         time: t.entryTime || TIME_NOW()
       };
       await supabase.from("wh_queue").upsert({ id: t.id, data: qData });
+      setQueue(prev => [...prev.filter(q => q.id !== t.id), qData]);
     }
     await supabase.from("wh_trucks").upsert({ id: t.id, data: t });
-    
+    setTrucks(prev => [...prev.filter(tr => tr.id !== t.id), t]);
+
     const actualTime = TIME_NOW();
     const diffStr = calcTimeDiffStr(t.entryTime, actualTime);
-    sendTeamsNotification(`🚛 รถ ${t.plate} เช็คอินเข้าโรงงานแล้ว`, { 
-      "ทะเบียน": t.plate, 
-      "กลุ่มลูกค้า": t.customerGroup, 
+    sendTeamsNotification(`🚛 รถ ${t.plate} เช็คอินเข้าโรงงานแล้ว`, {
+      "ทะเบียน": t.plate,
+      "กลุ่มลูกค้า": t.customerGroup,
       "เวลา STD": t.entryTime || "-",
       "เวลาเข้าจริง": `${actualTime} ${diffStr}`
     });
@@ -2077,7 +2111,9 @@ export default function App() {
        }
     }
 
-    await supabase.from("wh_trucks").upsert({ id, data: { ...truck, ...upd } });
+    const updated = { ...truck, ...upd };
+    await supabase.from("wh_trucks").upsert({ id, data: updated });
+    setTrucks(prev => prev.map(t => t.id === id ? updated : t));
   };
 
   const handleReset = async () => {
@@ -2097,6 +2133,7 @@ export default function App() {
       const { error: upErr } = await supabase.from("wh_queue").upsert(newQueue.map(q => ({ id: q.id, data: q })));
       if (upErr) throw new Error(upErr.message);
     }
+    setQueue(newQueue);
     // merge walk-in trucks กับ queue entries แบบ one-to-one เรียงตาม seq
     const sortedQueue = [...newQueue].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
     const usedQueueIds = new Set();
@@ -2119,7 +2156,6 @@ export default function App() {
   };
 
   const tabs = [
-    { id: "qr",            label: "📱 QR คนขับ", icon: "scan"      },
     { id: "dashboard", label: "Dashboard", icon: "chart"     },
     { id: "lg",        label: "① LG",      icon: "upload"    },
     { id: "driver",    label: "② คนขับ",   icon: "scan"      },
@@ -2131,6 +2167,7 @@ export default function App() {
     { id: "planning",      label: "⑦ Ordering",       icon: "plan"      },
     { id: "detail_loading", label: "⑧ Detail Loading", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
+    { id: "qr",            label: "📱 QR คนขับ", icon: "scan"      },
   ];
 
   // ── Driver-only mode ──
@@ -2150,6 +2187,40 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+      <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 80, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 22 }}>🏭</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
+          </div>
+          <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
+            style={{ marginLeft: 10, background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none" }}>
+            {tabs.map(t => {
+              const n = badge[t.id] || 0;
+              return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
+            })}
+          </select>
+          {tab === "dashboard" && (
+            <div style={{ display: "flex", gap: 2, marginLeft: 10 }}>
+              {[
+                { id: "main",       label: "Main",        icon: "chart"    },
+                { id: "lane_parts", label: "ชิ้นส่วน",    icon: "pig_cuts" },
+                { id: "lane_head",  label: "หัว/เครื่องใน", icon: "pig_head" },
+                { id: "lane_pork",  label: "หมูซีก",      icon: "pig_side" },
+              ].map(l => {
+                const active = dashLane === l.id;
+                return (
+                  <button key={l.id} onClick={() => setDashLane(l.id)}
+                    style={{ background: "transparent", color: active ? "#fff" : "#9ca3af", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "4px 10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{TODAY} {headerClock}</div>
+      </div>
       <div style={{ maxWidth: tab === "dashboard" ? "none" : 960, margin: "0 auto", padding: tab === "dashboard" ? "8px 14px 14px" : "20px 14px 100px" }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
         {tab === "qr"        && (
