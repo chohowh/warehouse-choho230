@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { getCycleDate } from '../utils/cycleDate'
 
 export default function Driver() {
   const [truckPlate, setTruckPlate] = useState('')
@@ -13,11 +14,12 @@ export default function Driver() {
       setMessage('กรุณากรอกข้อมูลให้ครบ')
       return
     }
+    const cycleDate = await getCycleDate()
     const { error } = await supabase.from('trucks').insert({
       Truck_Plate: truckPlate,
       Truck_Type: truckType,
       Status: 'waiting',
-      Que_Date: new Date().toISOString().split('T')[0]
+      Que_Date: cycleDate
     })
     if (error) {
       setMessage('Error: ' + error.message)
@@ -37,9 +39,12 @@ export default function Driver() {
           <label className="block text-sm font-bold mb-1">ทะเบียนรถ</label>
           <input
             className="w-full border rounded-lg p-2"
-            placeholder="เช่น กข-1234"
+            placeholder="เช่น 1234"
+            type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={truckPlate}
-            onChange={e => setTruckPlate(e.target.value)}
+            onChange={e => setTruckPlate(e.target.value.replace(/\D/g, ''))}
           />
         </div>
         <div>

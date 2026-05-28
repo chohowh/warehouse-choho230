@@ -1,4 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+
+const useIsMobile = () => {
+  const [v, setV] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setV(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return v;
+};
 import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
 import { sendTeamsNotification } from "./utils/teams";
@@ -39,7 +49,11 @@ const SHORT_DATE = `${new Date().getDate()}/${new Date().getMonth() + 1}/${new D
 const TIME_NOW = () => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 const getStep = (status) => STATUS_META[status]?.step ?? 0;
 
-const DATE_STR = () => new Date().toISOString().split("T")[0];
+const DATE_STR = () => {
+  const d = new Date();
+  if (d.getHours() < 9) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const safePlate = p => String(p).replace(/[^a-zA-Z0-9]/g, "") || "unknown";
 
 const compressImage = file => new Promise(resolve => {
@@ -334,12 +348,19 @@ const TruckCard = ({ t, children, highlight }) => (
 // ── TIME BAR ──────────────────────────────────────────────────────────────────
 const parseExitDatetime = (dateStr, timeStr) => {
   if (!timeStr) return null;
-  const [h, min] = timeStr.split(":").map(Number);
+  const timeParts = timeStr.split(":");
+  const h = parseInt(timeParts[0], 10);
+  const min = parseInt(timeParts[1], 10);
+  if (isNaN(h) || isNaN(min)) return null;
   if (dateStr) {
-    const [day, month, year] = dateStr.split("/").map(Number);
-    const d = new Date(year, month - 1, day, h, min, 0, 0);
-    if (h * 60 + min <= 9 * 60) d.setDate(d.getDate() + 1);
-    return d;
+    let [day, month, year] = dateStr.split("/").map(Number);
+    // handle M/D/YYYY format (US Excel) — month > 12 means day/month are swapped
+    if (month > 12) { [day, month] = [month, day]; }
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      const d = new Date(year, month - 1, day, h, min, 0, 0);
+      if (h * 60 + min <= 9 * 60) d.setDate(d.getDate() + 1);
+      return d;
+    }
   }
   // ไม่มี date → fallback วันนี้ + ปรับข้ามคืน
   const d = new Date(); d.setHours(h, min, 0, 0);
@@ -347,8 +368,8 @@ const parseExitDatetime = (dateStr, timeStr) => {
   return d;
 };
 
-const TimeBar = ({ exitTime, date, done, invoicedAt }) => {
-  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>;
+const TimeBar = ({ exitTime, date, done, invoicedAt, fs }) => {
+  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 20 : 11 }}>—</span>;
   const exitDt = parseExitDatetime(date, exitTime);
   const remaining = exitDt ? Math.round((exitDt - Date.now()) / 60000) : 0;
   const totalWindow = 240;
@@ -357,8 +378,8 @@ const TimeBar = ({ exitTime, date, done, invoicedAt }) => {
   if (done) {
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
-        {invoicedAt && <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
+        <div style={{ fontSize: fs ? 20 : 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
+        {invoicedAt && <div style={{ fontSize: fs ? 16 : 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
       </div>
     );
   }
@@ -390,19 +411,28 @@ const exportArchiveExcel = async (dateStr) => {
       "Zone":                           q.zone || "",
       "ทะเบียนรถ":                      q.plate || "",
       "น้ำหนักจัดรถ":                   "",
-      "เวลารถเข้าโรงงาน STD":           q.entryTime || "",
-      "เวลารถเข้าโรงงาน ACT":           truck?.arrivedAt || "",
-      "เวลาเข้าโหลดชิ้นส่วน STD":      "",
-      "เวลาเข้าโหลดชิ้นส่วน ACT":      truck?.qcLanes?.lane_parts?.doneAt || "",
-      "เวลาเสร็จสิ้นโหลดชิ้นส่วน":    truck?.loadLanes?.lane_parts?.doneAt || "",
-      "เวลาเข้าโหลดหัวเครื่องใน STD":  "",
-      "เวลาเข้าโหลดหัวเครื่องใน ACT":  truck?.qcLanes?.lane_head?.doneAt || "",
-      "เวลาเสร็จสิ้นโหลดหัวเครื่องใน": truck?.loadLanes?.lane_head?.doneAt || "",
-      "เวลาทำใบสรุปจ่าย":              truck?.summaryPrintedAt || "",
-      "เวลาทำใบ Invoice":               truck?.invoicedAt || "",
-      "เวลาออกจากโรงงาน":              q.exitTime || "",
-      "WT ลูกค้า":                      "",
-      "หมายเหตุ":                       "",
+      "เวลารถเข้าโรงงาน STD":            q.entryTime || "",
+      "เวลารถเข้าโรงงาน ACT":            truck?.arrivedAt || "",
+      "เวลาพิมพ์ใบเบิก (Picking)":       truck?.pickingAt || "",
+      "สถานะเพิ่มเติม":                  truck?.extraStatus || "",
+      "เวลาสถานะเพิ่มเติม":             truck?.extraStatusAt || "",
+      "เวลาเข้าโหลดชิ้นส่วน STD":       "",
+      "เวลาเข้าโหลดชิ้นส่วน ACT":       truck?.qcLanes?.lane_parts?.doneAt || "",
+      "เวลารอสินค้าชิ้นส่วน":           truck?.loadLanes?.lane_parts?.waitingAt || "",
+      "เวลาเสร็จสิ้นโหลดชิ้นส่วน":     truck?.loadLanes?.lane_parts?.doneAt || "",
+      "เวลาเข้าโหลดหัวเครื่องใน STD":   "",
+      "เวลาเข้าโหลดหัวเครื่องใน ACT":   truck?.qcLanes?.lane_head?.doneAt || "",
+      "เวลารอสินค้าหัวเครื่องใน":       truck?.loadLanes?.lane_head?.waitingAt || "",
+      "เวลาเสร็จสิ้นโหลดหัวเครื่องใน":  truck?.loadLanes?.lane_head?.doneAt || "",
+      "เวลาเข้าโหลดหมูซีก STD":         "",
+      "เวลาเข้าโหลดหมูซีก ACT":         truck?.qcLanes?.lane_pork?.doneAt || "",
+      "เวลารอสินค้าหมูซีก":             truck?.loadLanes?.lane_pork?.waitingAt || "",
+      "เวลาเสร็จสิ้นโหลดหมูซีก":       truck?.loadLanes?.lane_pork?.doneAt || "",
+      "เวลาทำใบสรุปจ่าย":               truck?.summaryPrintedAt || "",
+      "เวลาทำใบ Invoice":                truck?.invoicedAt || "",
+      "เวลาออกจากโรงงาน":               q.exitTime || "",
+      "WT ลูกค้า":                       "",
+      "หมายเหตุ":                        "",
     };
   });
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -413,8 +443,199 @@ const exportArchiveExcel = async (dateStr) => {
 
 const LANE_LABEL = { lane_parts: "ลานชิ้นส่วน", lane_head: "ลานหัว/เครื่องใน", lane_pork: "ลานหมูซีก" };
 
+const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemMins }) => {
+  const containerRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isTvMode, setIsTvMode] = useState(false);
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    const onChange = () => {
+      const inFs = !!document.fullscreenElement;
+      setIsFullscreen(inFs);
+      if (!inFs) setIsTvMode(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
+    else document.exitFullscreen();
+  };
+  const toggleTvMode = () => {
+    if (!isTvMode) {
+      containerRef.current?.requestFullscreen();
+      setIsTvMode(true);
+    } else {
+      document.exitFullscreen();
+    }
+  };
+  const fs = isTvMode;
+  const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: fs ? 28 : 13 }}>✓</span>;
+  const Dash = () => <span style={{ color: "#d1d5db", fontSize: fs ? 26 : 12 }}>—</span>;
+  const tdP = fs ? "22px 32px" : "10px 12px";
+  return (
+    <div ref={containerRef} style={{ display: "flex", flexDirection: "column", height: "100%", background: "#fff" }}>
+      <div style={{ padding: fs ? "20px 36px" : "10px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: fs ? 36 : 14, whiteSpace: "nowrap" }}>
+          🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "6px 18px" : "2px 8px", fontSize: fs ? 28 : 11, marginLeft: 4 }}>{allRows.length}</span>
+        </span>
+        <input
+          type="text"
+          placeholder="🔍 ค้นหาทะเบียน..."
+          value={searchPlate}
+          onChange={e => setSearchPlate(e.target.value)}
+          style={{ marginLeft: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: "5px 10px", fontSize: 12, width: 180, outline: "none", display: fs ? "none" : undefined }}
+        />
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen && !isTvMode ? "ย่อหน้าต่าง (Esc)" : "ขยายเต็มจอ (Desktop)"}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", cursor: "pointer", padding: "4px 8px", fontSize: 15, lineHeight: 1, color: "#374151", flexShrink: 0, display: fs ? "none" : "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {isFullscreen && !isTvMode ? "✕" : "⛶"}
+        </button>
+        <button
+          onClick={toggleTvMode}
+          title={fs ? "ออกจากโหมด TV" : "โหมด Smart TV"}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "10px 18px" : "4px 8px", fontSize: fs ? 30 : 15, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {fs ? "✕" : "📺"}
+        </button>
+      </div>
+      {visibleRows.length === 0
+        ? <div style={{ padding: fs ? 80 : 36, textAlign: "center", color: "#9ca3af", fontSize: fs ? 28 : 14 }}>
+            {searchPlate.trim() ? `ไม่พบทะเบียน "${searchPlate}"` : "ยังไม่มีรถเข้าโรงงาน"}
+          </div>
+        : isMobile && !fs
+        ? <div style={{ padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", maxHeight: "calc(100vh - 130px)" }}>
+            {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
+              const rem = getRemMins({ date, exitTime });
+              const urgent = rem < 20 && truck?.status !== "invoiced";
+              const anyQC = LOADING_LANES.some(l => truck?.qcLanes?.[l.id]?.done);
+              return (
+                <div key={key} style={{ background: urgent ? "#fff5f5" : "#fff", borderRadius: 14, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : "1px solid #f3f4f6" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
+                      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{customerGroup}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 16 }}>{entryTime || "—"}</div>
+                      {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>เข้าจริง {truck.arrivedAt}</div>}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} />
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    {!truck
+                      ? <span style={{ fontSize: 12, color: "#9ca3af", background: "#f9fafb", borderRadius: 8, padding: "4px 10px" }}>รอเช็คอิน</span>
+                      : !anyQC
+                      ? <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 8, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด</span>
+                      : LOADING_LANES.map(l => {
+                          const loaded = truck.loadLanes?.[l.id]?.done;
+                          const qcDone = truck.qcLanes?.[l.id]?.done;
+                          const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
+                          if (loaded) return <span key={l.id} style={{ background: "#10b981", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>✓ {l.tinyLabel}</span>;
+                          if (waiting) return <span key={l.id} style={{ background: "#fbbf24", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>⏳ รอสินค้า {l.tinyLabel}</span>;
+                          if (qcDone) return <span key={l.id} style={{ background: "#fff7ed", color: "#f97316", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700, border: "1px solid #fed7aa" }}>โหลด {l.tinyLabel}</span>;
+                          return null;
+                        })
+                    }
+                    {truck?.extraStatus && <span style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, paddingTop: 10, borderTop: "1px solid #f3f4f6" }}>
+                    {[{label:"ใบเบิก", done: truck?.pickupPrinted},{label:"ใบสรุป", done: truck?.summaryPrinted},{label:"Invoice", done: truck?.status === "invoiced"}].map(item => (
+                      <span key={item.label} style={{ flex: 1, textAlign: "center", fontSize: 11, color: item.done ? "#10b981" : "#d1d5db", fontWeight: 700 }}>
+                        {item.done ? "✓" : "—"} {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        : <div style={{ overflowX: "auto", overflowY: "auto", flex: 1, maxHeight: fs ? undefined : "calc(100vh - 170px)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs ? 26 : 12 }}>
+              <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
+                <tr style={{ background: "#f9fafb" }}>
+                  {(fs
+                    ? [{l:"ทะเบียน",w:140},{l:"เวลาเข้าโรงงาน",w:200},{l:"เวลาออกจากโรงงาน",w:340},{l:"สถานะ",w:"auto"}]
+                    : [{l:"ทะเบียน",w:60},{l:"กลุ่มลูกค้า",w:100},{l:"เวลาเข้าโรงงาน",w:90},{l:"เวลาออกจากโรงงาน",w:200},{l:"สถานะ",w:"auto"},{l:"ใบเบิกสินค้า",w:60},{l:"ใบสรุปจ่าย",w:60},{l:"ใบ Invoice",w:60}]
+                  ).map(h => (
+                    <th key={h.l} style={{ width: h.w, padding: fs ? "20px 32px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", fontSize: fs ? 22 : undefined }}>{h.l}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
+                  const rem = getRemMins({ date, exitTime });
+                  const urgent = rem < 20 && truck?.status !== "invoiced";
+                  return (
+                    <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 30 : undefined }}>{plate}</td>
+                      {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
+                      <td style={{ padding: tdP, whiteSpace: "nowrap" }}>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
+                        {truck?.arrivedAt
+                          ? <div style={{ fontSize: fs ? 18 : 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
+                          : <div style={{ fontSize: fs ? 18 : 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
+                      </td>
+                      <td style={{ padding: tdP }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={fs} /></td>
+                      <td style={{ padding: tdP }}>
+                        {!truck
+                          ? <span style={{ fontSize: fs ? 24 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
+                          : (() => {
+                              const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
+                              if (!anyQC) return <span style={{ fontSize: fs ? 24 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
+                              return (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 10 : 4 }}>
+                                  {LOADING_LANES.map(l => {
+                                    const loaded = truck.loadLanes?.[l.id]?.done;
+                                    const qcDone = truck.qcLanes?.[l.id]?.done;
+                                    const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
+                                    if (loaded) return (
+                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 12, padding: fs ? "8px 20px 10px 18px" : "3px 10px 5px 8px", fontSize: fs ? 22 : 11, fontWeight: 700, lineHeight: 1.4 }}>
+                                        {l.tinyLabel}
+                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: fs ? 24 : 14, height: fs ? 24 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 13 : 8, fontWeight: 900 }}>✓</span>
+                                      </div>
+                                    );
+                                    if (waiting) return (
+                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 12, padding: fs ? "8px 20px 10px 18px" : "3px 10px 5px 8px", fontSize: fs ? 22 : 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
+                                        รอสินค้า {l.tinyLabel}
+                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: fs ? 24 : 14, height: fs ? 24 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 13 : 8 }}>⏳</span>
+                                      </div>
+                                    );
+                                    if (qcDone) return <span key={l.id} style={{ fontSize: fs ? 22 : 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>;
+                                    return null;
+                                  })}
+                                </div>
+                              );
+                            })()
+                        }
+                        {truck?.extraStatus && (
+                          <div style={{ marginTop: 4 }}>
+                            <span style={{ display: "inline-block", background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: fs ? "6px 16px" : "2px 8px", fontSize: fs ? 20 : 10, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>
+                          </div>
+                        )}
+                      </td>
+                      {!fs && <td style={{ padding: tdP }}>{truck?.pickupPrinted ? <Tick/> : <Dash/>}</td>}
+                      {!fs && <td style={{ padding: tdP }}>{truck?.summaryPrinted ? <Tick/> : <Dash/>}</td>}
+                      {!fs && <td style={{ padding: tdP }}>{truck?.status === "invoiced" ? <Tick/> : <Dash/>}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+      }
+    </div>
+  );
+};
+
 const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  const [searchPlate, setSearchPlate] = useState("");
+  const isMobile = useIsMobile();
   useEffect(() => {
     const id = setInterval(() => setClock(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })), 1000);
     return () => clearInterval(id);
@@ -446,176 +667,45 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
   const allRows = [
     ...dashQueueRows,
     ...walkIns.map(t => ({ key: t.id, date: t.date || "", plate: t.plate, customerGroup: t.customerGroup || "–", entryTime: t.entryTime || "", exitTime: t.exitTime || "", truck: t })),
-  ].sort((a, b) => {
+  ].filter(row => row.customerGroup !== "CPFTH")
+  .filter(row => !lane || !row.truck?.loadLanes?.[lane]?.done)
+  .sort((a, b) => {
     const rank = row => {
-      if (!row.truck) return 2;
-      if (["invoiced", "summary_printed"].includes(row.truck.status)) return 4;
+      if (["invoiced", "summary_printed"].includes(row.truck?.status)) return 5;
 
       if (lane) {
-        // If detailMap has data, trucks not assigned to this lane go to bottom
-        if (Object.keys(detailMap || {}).length > 0) {
-          const plateKey = String(row.plate).replace(/\s/g, "").toUpperCase();
-          const laneSets = (detailMap || {})[plateKey];
-          if (laneSets && !laneSets.has(lane)) return 5; // no product for this lane
-        }
-        if (row.truck.loadLanes?.[lane]?.done) return 3;       // โหลดลานนี้เสร็จแล้ว → ล่าง
-        const qcDone = row.truck.qcLanes?.[lane]?.done;
-        const waiting = row.truck.loadLanes?.[lane]?.waiting;
-        if (qcDone || waiting) return 0;                        // กำลังโหลด/รอสินค้า → บน
-        return 1;                                               // ยังไม่ QC ลานนี้
+        const qcDone = row.truck?.qcLanes?.[lane]?.done;
+        const waiting = row.truck?.loadLanes?.[lane]?.waiting;
+        if (qcDone || waiting) return 0;   // กำลังโหลดอยู่ → บนสุด
+      } else {
+        const anyActive = LOADING_LANES.some(l =>
+          row.truck?.qcLanes?.[l.id]?.done && !row.truck?.loadLanes?.[l.id]?.done
+        );
+        if (anyActive) return 0;           // กำลังโหลดอยู่ → บนสุด
       }
 
-      const anyQC = LOADING_LANES.some(l => row.truck.qcLanes?.[l.id]?.done);
-      return anyQC ? 0 : 1;
+      if (!row.truck) return 2;            // 2.2 ยังไม่เข้าโรงงาน
+      return 1;                            // 2.1 เข้าโรงงานแล้ว แต่ไม่ได้โหลดอยู่
     };
     const ra = rank(a), rb = rank(b);
     if (ra !== rb) return ra - rb;
     return getRemMins(a) - getRemMins(b);
   });
-
-  const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
-  const Dash = () => <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
+  const visibleRows = searchPlate.trim()
+    ? allRows.filter(r => r.plate?.toLowerCase().includes(searchPlate.trim().toLowerCase()))
+    : allRows;
 
   return (
     <div>
       {/* Sticky header */}
-      <div style={{ position: "sticky", top: 56, zIndex: 40, background: "#f1f5f9", paddingBottom: 8, paddingTop: 0 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>{lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
-          </div>
+      <div style={{ position: "sticky", top: 80, zIndex: 40, background: "#f1f5f9", paddingBottom: isMobile ? 6 : 8, paddingTop: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+          <h2 style={{ margin: 0, fontSize: isMobile ? 16 : 22, fontWeight: 900 }}>{lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: import.meta.env.DEV ? "1fr" : "120px 1fr", gap: 12, alignItems: "start" }}>
-        {/* Left: sticky stat cards */}
-        {!import.meta.env.DEV && (
-        <div style={{ position: "sticky", top: 100, alignSelf: "start", display: "flex", flexDirection: "column", gap: 10 }}>
-          {stats.map(s => (
-            <div key={s.label} style={{ background: "#fff", borderRadius: 12, padding: "12px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${s.color}` }}>
-              <div style={{ color: s.color, marginBottom: 3 }}><Icon name={s.icon} size={16} /></div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: "#6b7280", marginTop: 3 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-        )}
-
-        {/* Right: truck table */}
-        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
-            🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{allRows.length}</span>
-          </div>
-          {allRows.length === 0
-            ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>ยังไม่มีรถเข้าโรงงาน</div>
-            : <>
-              {/* Mobile cards */}
-              <div className="mobile-only" style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                {allRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
-                  const rem = getRemMins({ date, exitTime });
-                  const color = rem <= 0 ? "#ef4444" : rem <= 20 ? "#ef4444" : rem <= 60 ? "#f59e0b" : "#22c55e";
-                  const pct = Math.min(Math.max(rem / 240, 0), 1) * 100;
-                  const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
-                  const label = rem < 0 ? `เกิน ${fmtMins(rem)} ชม.` : `เหลือ ${fmtMins(rem)} ชม.`;
-                  const statusLabel = !truck ? "รอเช็คอิน" : truck.status === "invoiced" ? "Invoice แล้ว" : truck.status === "summary_printed" ? "โหลดเสร็จ" : truck.status === "picking" ? "กำลังโหลด" : truck.status === "arrived" ? "รอเข้าโหลด" : "รอเช็คอิน";
-                  const statusColor = !truck ? "#9ca3af" : truck.status === "invoiced" ? "#6b7280" : truck.status === "picking" ? "#f97316" : truck.status === "arrived" ? "#3b82f6" : "#9ca3af";
-                  return (
-                    <div key={key} style={{ background: "#f9fafb", borderRadius: 10, padding: "10px 12px", borderLeft: `4px solid ${color}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 900, fontSize: 15 }}>{plate}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{statusLabel}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{customerGroup}</div>
-                      <div style={{ display: "flex", gap: 12, fontSize: 12, marginBottom: 6 }}>
-                        <div><span style={{ color: "#9ca3af" }}>เข้า </span><span style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</span></div>
-                        <div><span style={{ color: "#9ca3af" }}>ออก </span><span style={{ fontWeight: 700, color: rem <= 0 ? "#ef4444" : "#374151" }}>{exitTime || "—"}</span></div>
-                        {exitTime && <div style={{ fontWeight: 700, color, fontSize: 11 }}>{label}</div>}
-                      </div>
-                      {exitTime && <div style={{ height: 4, borderRadius: 0, background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />}
-                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                        <span style={{ fontSize: 10, color: truck?.pickupPrinted ? "#10b981" : "#d1d5db", fontWeight: 700 }}>ใบเบิก{truck?.pickupPrinted ? "✓" : "–"}</span>
-                        <span style={{ fontSize: 10, color: truck?.summaryPrinted ? "#10b981" : "#d1d5db", fontWeight: 700 }}>ใบสรุป{truck?.summaryPrinted ? "✓" : "–"}</span>
-                        <span style={{ fontSize: 10, color: truck?.status === "invoiced" ? "#10b981" : "#d1d5db", fontWeight: 700 }}>Invoice{truck?.status === "invoiced" ? "✓" : "–"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Desktop table */}
-              <div className="desktop-only" style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 170px)" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-                    <tr style={{ background: "#f9fafb" }}>
-                      {[{l:"ทะเบียน",w:60},{l:"กลุ่มลูกค้า",w:100},{l:"เวลาเข้าโรงงาน",w:90},{l:"เวลาออกจากโรงงาน",w:200},{l:"สถานะ",w:"auto"},{l:"ใบเบิกสินค้า",w:60},{l:"ใบสรุปจ่าย",w:60},{l:"ใบ Invoice",w:60}].map(h => (
-                        <th key={h.l} style={{ width: h.w, padding: "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h.l}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
-                      const rem = getRemMins({ date, exitTime });
-                      const urgent = rem < 20 && truck?.status !== "invoiced";
-                      return (
-                      <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
-                        <td style={{ padding: "10px 12px", color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>
-                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", verticalAlign: "top" }}>
-                          <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 13, lineHeight: "18px" }}>{entryTime || "—"}</div>
-                          {truck?.arrivedAt
-                            ? <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>เข้าจริง {truck.arrivedAt}</div>
-                            : <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>(รถยังไม่เข้าโรงงาน)</div>}
-                        </td>
-                        <td style={{ padding: "10px 12px", verticalAlign: "top" }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} /></td>
-                        <td style={{ padding: "10px 12px" }}>
-                          {!truck
-                            ? <span style={{ fontSize: 11, color: "#9ca3af" }}>รอเช็คอิน</span>
-                            : (() => {
-                                const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
-                                if (!anyQC) return <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
-                                return (
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                                    {LOADING_LANES.map(l => {
-                                      const loaded = truck.loadLanes?.[l.id]?.done;
-                                      const qcDone = truck.qcLanes?.[l.id]?.done;
-                                      const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
-                                      if (loaded) return (
-                                        <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 12, padding: "3px 10px 5px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.4 }}>
-                                          {l.tinyLabel}
-                                          <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900 }}>✓</span>
-                                        </div>
-                                      );
-                                      if (waiting) return (
-                                          <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 12, padding: "3px 10px 5px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
-                                            รอสินค้า {l.tinyLabel}
-                                            <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }}>⏳</span>
-                                          </div>
-                                        );
-                                      if (qcDone) return <span key={l.id} style={{ fontSize: 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>;
-                                      return null;
-                                    })}
-                                  </div>
-                                );
-                              })()
-                          }
-                          {truck?.extraStatus && (
-                            <div style={{ marginTop: 4 }}>
-                              <span style={{ display: "inline-block", background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: "10px 12px" }}>{truck?.pickupPrinted ? <Tick/> : <Dash/>}</td>
-                        <td style={{ padding: "10px 12px" }}>{truck?.summaryPrinted ? <Tick/> : <Dash/>}</td>
-                        <td style={{ padding: "10px 12px" }}>
-                          {truck?.status === "invoiced" ? <Tick/> : <Dash/>}
-                        </td>
-                      </tr>
-                    );})}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          }
-        </div>
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", marginTop: 8 }}>
+        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} />
       </div>
     </div>
   );
@@ -642,9 +732,9 @@ const matchCol = (header) => {
 };
 
 const parseQueueDateToISO = (dateStr) => {
-  if (!dateStr) return new Date().toISOString().split("T")[0];
+  if (!dateStr) return DATE_STR();
   const parts = dateStr.split("/");
-  if (parts.length !== 3) return new Date().toISOString().split("T")[0];
+  if (parts.length !== 3) return DATE_STR();
   const [d, m, y] = parts.map(Number);
   return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 };
@@ -674,6 +764,21 @@ const toHHMM = (val) => {
     return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
   }
   return String(val);
+};
+
+// ถ้า exitTime อยู่ในช่วง 00:00–09:00 → วันที่จริงคือ dateStr + 1 (กะข้ามคืน)
+const displayDate = (dateStr, exitTime) => {
+  if (!dateStr || !exitTime) return dateStr || "";
+  const [hStr, minStr] = exitTime.split(":");
+  const h = parseInt(hStr, 10); const min = parseInt(minStr, 10);
+  if (isNaN(h) || isNaN(min) || h * 60 + min > 9 * 60) return dateStr;
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return dateStr;
+  let [d, m, y] = parts.map(Number);
+  if (m > 12) { [d, m] = [m, d]; }
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
 };
 
 const LGUpload = ({ queue, onSetQueue }) => {
@@ -834,7 +939,7 @@ const LGUpload = ({ queue, onSetQueue }) => {
               <tbody>
                 {extracted.map((t, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "8px 12px", color: "#6b7280" }}>{t.date}</td>
+                    <td style={{ padding: "8px 12px", color: "#6b7280" }}>{displayDate(t.date, t.exitTime)}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 800 }}>{t.plate}</td>
                     <td style={{ padding: "8px 12px" }}>{t.customerGroup}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 700, color: "#7c3aed" }}>{t.zone}</td>
@@ -886,7 +991,7 @@ const LGUpload = ({ queue, onSetQueue }) => {
                   const isEditing = editId === q.id;
                   return (
                     <tr key={q.id} style={{ borderBottom: "1px solid #f3f4f6", background: isEditing ? "#fffbeb" : undefined }}>
-                      <td style={{ padding: "8px 12px", color: "#6b7280" }}>{q.date}</td>
+                      <td style={{ padding: "8px 12px", color: "#6b7280" }}>{displayDate(q.date, q.exitTime)}</td>
                       <td style={{ padding: "8px 12px", fontWeight: 800 }}>
                         {isEditing
                           ? <input style={inputStyle} value={editData.plate} onChange={e => setEditData(d => ({ ...d, plate: e.target.value }))} />
@@ -1067,22 +1172,14 @@ const DriverScan = ({ queue, trucks, onScan, skipGeofence }) => {
           <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: 2, marginBottom: 4 }}>{pendingEntry.plate}</div>
           {pendingEntry.customerGroup && <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>กลุ่มลูกค้า: {pendingEntry.customerGroup}</div>}
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>📍 Zone</label>
-          <select value={selectedZone} onChange={e => setSelectedZone(e.target.value)}
-            style={{ width: "100%", border: "2px solid #e5e7eb", borderRadius: 10, padding: "12px 14px", fontSize: 16, fontWeight: 700, outline: "none", boxSizing: "border-box", background: "#fff" }}>
-            <option value="">— ไม่ระบุ —</option>
-            {(() => {
-              const usedIds = new Set(trucks.map(t => t.queueId).filter(Boolean));
-              const zones = [];
-              queue
-                .filter(q => matchPlate(q.plate, pendingEntry.plate) && !usedIds.has(q.id))
-                .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
-                .forEach(q => { if (q.zone && !zones.includes(q.zone)) zones.push(q.zone); });
-              return zones.map(z => <option key={z} value={z}>{z}</option>);
-            })()}
-          </select>
-        </div>
+        {selectedZone && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>📍 Zone</label>
+            <div style={{ width: "100%", border: "2px solid #e5e7eb", borderRadius: 10, padding: "12px 14px", fontSize: 16, fontWeight: 700, boxSizing: "border-box", background: "#f9fafb", color: "#7c3aed" }}>
+              {selectedZone}
+            </div>
+          </div>
+        )}
         <button onClick={handleConfirm}
           style={{ width: "100%", background: "#111", color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
           ✅ ยืนยันเช็คอิน
@@ -1106,8 +1203,9 @@ const DriverScan = ({ queue, trucks, onScan, skipGeofence }) => {
           </div>
           <p style={{ fontWeight: 700, fontSize: 15, margin: 0 }}>เช็คอินเข้าโรงงาน</p>
         </div>
-        <input value={plate} onChange={e => setPlate(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSearch()}
+        <input value={plate} onChange={e => setPlate(e.target.value.replace(/\D/g, ''))} onKeyDown={e => e.key === "Enter" && handleSearch()}
           placeholder="กรอกเลขทะเบียนของท่าน เช่น 1234"
+          type="tel" inputMode="numeric" pattern="[0-9]*"
           style={{ width: "100%", border: "2px solid #e5e7eb", borderRadius: 10, padding: "14px 16px", fontSize: 18, fontWeight: 800, textAlign: "center", outline: "none", boxSizing: "border-box" }} />
         <button onClick={handleSearch} style={{ marginTop: 10, width: "100%", background: "#111", color: "#fff", border: "none", borderRadius: 10, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
           ค้นหา
@@ -1126,7 +1224,7 @@ const DriverScan = ({ queue, trucks, onScan, skipGeofence }) => {
 };
 
 // ── 3+6. PICKING ──────────────────────────────────────────────────────────────
-const Picking = ({ trucks, queue, onUpdate }) => {
+const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
 
   // รวม queue + walk-in (รถที่เข้าแล้วแต่ยังไม่มีในคิว)
   const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
@@ -1154,7 +1252,7 @@ const Picking = ({ trucks, queue, onUpdate }) => {
       return 2;                                  // รอขั้นตอนอื่น
     };
     return rank(a.truck) - rank(b.truck);
-  });
+  }).filter(row => row.customerGroup !== "CPFTH");
 
   const [searchQuery, setSearchQuery] = useState("");
   const filteredRows = allRows.filter(r => r.plate.includes(searchQuery));
@@ -1188,7 +1286,7 @@ const Picking = ({ trucks, queue, onUpdate }) => {
             <option value="รอแปรสินค้า" />
             <option value="ติดปัญหา IT" />
           </datalist>
-          <button onClick={() => { if(val) onUpdate(truck.id, { extraStatus: val }); setIsEditing(false); }} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
+          <button onClick={() => { if(val) onUpdate(truck.id, { extraStatus: val, extraStatusAt: TIME_NOW() }); setIsEditing(false); }} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
           <button onClick={() => setIsEditing(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
         </div>
       );
@@ -1204,7 +1302,7 @@ const Picking = ({ trucks, queue, onUpdate }) => {
     if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     if (doneStep3(truck)) return <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
     if (canStep3(truck)) return (
-      <button onClick={() => onUpdate(truck.id, { pickupPrinted: true, status: "picking" })}
+      <button onClick={() => onUpdate(truck.id, { pickupPrinted: true, status: "picking", pickingAt: TIME_NOW() })}
         style={{ background: "#c2410c", color: "#fff", border: "none", borderRadius: 6, padding: "5px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
         🖨️ เบิก
       </button>
@@ -1244,7 +1342,13 @@ const Picking = ({ trucks, queue, onUpdate }) => {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["ทะเบียน","กลุ่มลูกค้า","เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"].map(h => (
+                  {["ทะเบียน","กลุ่มลูกค้า"].map(h => (
+                    <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
+                  ))}
+                  {LOADING_LANES.map(l => (
+                    <th key={l.id} style={{ padding: "9px 12px", textAlign: "center", fontWeight: 700, color: l.color, whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{l.tinyLabel}</th>
+                  ))}
+                  {["เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"].map(h => (
                     <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
                   ))}
                 </tr>
@@ -1254,6 +1358,18 @@ const Picking = ({ trucks, queue, onUpdate }) => {
                   <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
                     <td style={{ padding: "10px 12px", color: "#374151" }}>{customerGroup}</td>
+                    {(() => {
+                      const num = plateNum(plate);
+                      const matched = num ? Object.entries(detailMap).find(([k]) => plateNum(k) === num) : null;
+                      const lanes = matched ? matched[1] : new Set();
+                      return LOADING_LANES.map(l => (
+                        <td key={l.id} style={{ padding: "10px 12px", textAlign: "center" }}>
+                          {lanes.has(l.id)
+                            ? <span style={{ color: l.color, fontWeight: 900, fontSize: 16 }}>✓</span>
+                            : <span style={{ color: "#e5e7eb" }}>—</span>}
+                        </td>
+                      ));
+                    })()}
                     <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
                       <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
                       {truck?.arrivedAt
@@ -1323,7 +1439,7 @@ const QC = ({ trucks, onUpdate }) => {
   const [uploading, setUploading] = useState(false);
 
   // รับทุกรถที่สถานะ "picking" (พิมพ์เบิกแล้ว)
-  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status));
+  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && t.customerGroup !== "CPFTH");
   const sel      = trucks.find(t => t.id === selId) || null;
   const actLane  = LOADING_LANES.find(l => l.id === lane);
   const thisLaneQCd = sel?.qcLanes?.[lane]?.done;
@@ -1451,6 +1567,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
   // รถที่ QC ลานนี้ผ่านแล้ว และยังไม่ได้โหลดลานนี้
   const eligibleForLane = (laneId) => trucks.filter(t =>
     ["arrived", "picking"].includes(t.status) &&
+    t.customerGroup !== "CPFTH" &&
     t.qcLanes?.[laneId]?.done &&
     !t.loadLanes?.[laneId]?.done
   );
@@ -1471,7 +1588,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
   const handleWaiting = () => {
     if (!sel) return;
     if (!window.confirm(`ยืนยัน: ${sel.plate} — รอเติมสินค้า?`)) return;
-    const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, note: form.note } };
+    const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), note: form.note } };
     onUpdate(sel.id, { loadLanes });
     setF(activeLane, { selId: "", photo: null, note: "" });
   };
@@ -1483,7 +1600,8 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
     try {
       const photos = Array.isArray(form.photo) ? form.photo : (form.photo ? [form.photo] : []);
       const photoUrls = await uploadPhotos(`loading/${activeLane}`, sel.plate, photos);
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW() } };
+      const existing = sel.loadLanes?.[activeLane] || {};
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW() } };
       onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false });
       setTimeout(() => setF(activeLane, { flash: false }), 2500);
@@ -1591,7 +1709,7 @@ const Planning = ({ trucks, queue, onUpdate }) => {
       return 2;
     };
     return rank(a.truck) - rank(b.truck);
-  });
+  }).filter(row => row.customerGroup !== "CPFTH");
 
   const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
   const Dash = () => <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
@@ -1695,17 +1813,31 @@ const Download = ({ onReset }) => {
   const [exportDate, setExportDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [archives, setArchives] = useState([]);
+  const [deleteDate, setDeleteDate] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
+  const loadArchives = () => {
     supabase.from("wh_archive").select("archive_date").order("archive_date", { ascending: false })
       .then(({ data }) => setArchives((data || []).map(r => r.archive_date)));
-  }, []);
+  };
+
+  useEffect(() => { loadArchives(); }, []);
 
   const handleDownload = async () => {
     if (!exportDate) return;
     setLoading(true);
     await exportArchiveExcel(exportDate);
     setLoading(false);
+  };
+
+  const handleDeleteArchive = async () => {
+    if (!deleteDate) return;
+    if (!window.confirm(`ลบข้อมูล Archive วันที่ ${deleteDate} ถาวร?`)) return;
+    setDeleting(true);
+    await supabase.from("wh_archive").delete().eq("archive_date", deleteDate);
+    setDeleteDate("");
+    loadArchives();
+    setDeleting(false);
   };
 
   return (
@@ -1751,6 +1883,278 @@ const Download = ({ onReset }) => {
           </div>
         )}
       </div>
+
+      <h3 style={{ margin: "24px 0 12px", fontWeight: 800, fontSize: 16 }}>🗑️ ลบข้อมูลย้อนหลัง</h3>
+      <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 24, maxWidth: 480 }}>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 14 }}>เลือกวันที่แล้วลบข้อมูล Archive — การลบจะไม่สามารถกู้คืนได้</div>
+        {archives.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 8 }}>เลือกจาก Archive ที่มี</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {archives.map(d => (
+                <button key={d} onClick={() => setDeleteDate(d)}
+                  style={{ background: deleteDate === d ? "#991b1b" : "#f3f4f6", color: deleteDate === d ? "#fff" : "#374151", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <input
+          type="date"
+          value={deleteDate}
+          onChange={e => setDeleteDate(e.target.value)}
+          style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", marginBottom: 12 }}
+        />
+        <button
+          onClick={handleDeleteArchive}
+          disabled={!deleteDate || deleting}
+          style={{ width: "100%", background: deleteDate ? "#fee2e2" : "#e5e7eb", color: deleteDate ? "#991b1b" : "#9ca3af", border: deleteDate ? "1.5px solid #fca5a5" : "none", borderRadius: 10, padding: "13px 0", fontSize: 15, fontWeight: 700, cursor: deleteDate ? "pointer" : "default" }}
+        >
+          {deleting ? "กำลังลบ..." : `🗑️ ลบ Archive${deleteDate ? ` วันที่ ${deleteDate}` : ""}`}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────────────────────────────────────────
+const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
+  const [selId,   setSelId]   = useState("");
+  const [form,    setForm]    = useState(null);
+  const [msg,     setMsg]     = useState("");
+  const [mergeId, setMergeId] = useState("");
+
+  const truck  = trucks.find(t => t.id === selId);
+
+  // unique values from queue entries matching this truck's plate
+  const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
+  const matchedQueue   = truck ? queue.filter(q => plateNum(q.plate) === plateNum(truck.plate)) : [];
+  const duplicateTrucks = truck ? trucks.filter(t => t.id !== selId && plateNum(t.plate) === plateNum(truck.plate)) : [];
+  const queueZones  = [...new Set(matchedQueue.map(q => q.zone).filter(Boolean))];
+  const queueGroups = [...new Set(matchedQueue.map(q => q.customerGroup).filter(Boolean))];
+
+  useEffect(() => {
+    if (!truck) { setForm(null); setMsg(""); return; }
+    setForm({
+      queueId:       truck.queueId       || "",
+      customerGroup: truck.customerGroup || "",
+      zone:          truck.zone          || "",
+      entryTime:     truck.entryTime     || "",
+      exitTime:      truck.exitTime      || "",
+      status:        truck.status        || "arrived",
+      qcLanes:       JSON.parse(JSON.stringify(truck.qcLanes   || {})),
+      loadLanes:     JSON.parse(JSON.stringify(truck.loadLanes || {})),
+    });
+    setMsg("");
+  }, [selId]);
+
+  const linkQueue = (qid) => {
+    const q = matchedQueue.find(q => q.id === qid);
+    if (!q) return;
+    setForm(f => ({ ...f, queueId: q.id, zone: q.zone || "", customerGroup: q.customerGroup || "", entryTime: q.entryTime || "", exitTime: q.exitTime || "" }));
+  };
+
+  const save = async () => {
+    await onUpdate(selId, form);
+    setMsg("✅ บันทึกแล้ว");
+    setTimeout(() => setMsg(""), 2500);
+  };
+
+  const handleMerge = async () => {
+    const src = trucks.find(t => t.id === mergeId);
+    if (!src || !truck) return;
+    if (!window.confirm(`Merge ข้อมูลจาก ${src.plate} (zone: ${src.zone || "–"}) เข้า ${truck.plate} (zone: ${truck.zone || "–"}) แล้วลบรถต้นทางออก?`)) return;
+    // merge lane-by-lane: T-1 (target) มีสิทธิ์ก่อน ถ้า T-1 ไม่มีค่อยเอาของ T-2
+    const mergedQC   = { ...(src.qcLanes   || {}) };
+    const mergedLoad = { ...(src.loadLanes  || {}) };
+    for (const l of LOADING_LANES) {
+      if (truck.qcLanes?.[l.id]?.done)   mergedQC[l.id]   = truck.qcLanes[l.id];
+      if (truck.loadLanes?.[l.id]?.done)  mergedLoad[l.id] = truck.loadLanes[l.id];
+    }
+    await onUpdate(selId, { qcLanes: mergedQC, loadLanes: mergedLoad });
+    await onDeleteTruck(mergeId);
+    setMergeId("");
+    setMsg("✅ Merge สำเร็จ — ลบรถซ้ำแล้ว");
+    setTimeout(() => setMsg(""), 3000);
+  };
+
+  const setQC   = (lid, key, val) => setForm(f => ({ ...f, qcLanes:   { ...f.qcLanes,   [lid]: { ...(f.qcLanes[lid]   || {}), [key]: val } } }));
+  const setLoad = (lid, key, val) => setForm(f => ({ ...f, loadLanes: { ...f.loadLanes, [lid]: { ...(f.loadLanes[lid] || {}), [key]: val } } }));
+  const resetQC   = (lid) => setForm(f => ({ ...f, qcLanes:   { ...f.qcLanes,   [lid]: {} } }));
+  const resetLoad = (lid) => setForm(f => ({ ...f, loadLanes: { ...f.loadLanes, [lid]: {} } }));
+
+  const card  = { background: "#fff", borderRadius: 12, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl   = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp   = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 8, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+      <h2 style={{ fontWeight: 900, fontSize: 22, marginBottom: 16 }}>⚙️ Admin — แก้ไขข้อมูล</h2>
+
+      {/* Truck selector */}
+      <div style={card}>
+        <label style={lbl}>เลือกทะเบียนรถ</label>
+        <select value={selId} onChange={e => setSelId(e.target.value)} style={{ ...inp, fontSize: 15 }}>
+          <option value="">— เลือกรถ —</option>
+          {trucks.map(t => (
+            <option key={t.id} value={t.id}>{t.plate}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Merge — แสดงเฉพาะเมื่อมีรถ plate เดียวกันในระบบ */}
+      {truck && duplicateTrucks.length > 0 && (
+        <div style={{ ...card, border: "1.5px solid #fde047", background: "#fefce8" }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>🔀 Merge รถซ้ำ</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+            พบทะเบียน <b>{truck.plate}</b> ในระบบ {duplicateTrucks.length + 1} คัน — เลือกรถที่จะดูดข้อมูล (source) เข้ามารวมกับตัวนี้ แล้วรถ source จะถูกลบ
+          </div>
+          <select value={mergeId} onChange={e => setMergeId(e.target.value)} style={{ ...inp, marginBottom: 10 }}>
+            <option value="">— เลือกรถ source —</option>
+            {duplicateTrucks.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.plate} · zone: {t.zone || "–"} · {STATUS_META[t.status]?.label || t.status}
+                {t.qcLanes ? ` · QC: ${LOADING_LANES.filter(l => t.qcLanes[l.id]?.done).map(l => l.tinyLabel).join(", ") || "ยังไม่มี"}` : ""}
+              </option>
+            ))}
+          </select>
+          <button onClick={handleMerge} disabled={!mergeId}
+            style={{ width: "100%", background: mergeId ? "#854d0e" : "#e5e7eb", color: mergeId ? "#fff" : "#9ca3af", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 14, fontWeight: 700, cursor: mergeId ? "pointer" : "default" }}>
+            🔀 Merge และลบรถ source
+          </button>
+        </div>
+      )}
+
+      {truck && form && (
+        <>
+          {/* ผูก Queue Entry */}
+          <div style={card}>
+            <label style={lbl}>🔗 ผูก Queue Entry (เปลี่ยนข้อมูลจาก LG)</label>
+            <select value={form.queueId} onChange={e => linkQueue(e.target.value)} style={{ ...inp, fontSize: 13 }}>
+              <option value="">— เลือก Queue Entry —</option>
+              {matchedQueue.map(q => (
+                <option key={q.id} value={q.id}>
+                  {q.zone || "–"} · {q.customerGroup || "–"} · เข้า {q.entryTime || "–"} · ออก {q.exitTime || "–"}
+                </option>
+              ))}
+            </select>
+            {form.queueId && (
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+                ผูกอยู่กับ: Zone <b>{form.zone || "–"}</b> · กลุ่ม <b>{form.customerGroup || "–"}</b> · ออก <b>{form.exitTime || "–"}</b>
+              </div>
+            )}
+          </div>
+
+          {/* กลุ่มลูกค้า + Zone */}
+          <div style={card}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={lbl}>👥 กลุ่มลูกค้า</label>
+                <select value={form.customerGroup} onChange={e => setForm(f => ({ ...f, customerGroup: e.target.value }))} style={inp}>
+                  <option value="">— ไม่ระบุ —</option>
+                  {queueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>📍 Zone</label>
+                <select value={form.zone} onChange={e => setForm(f => ({ ...f, zone: e.target.value }))} style={inp}>
+                  <option value="">— ไม่ระบุ —</option>
+                  {queueZones.map(z => <option key={z} value={z}>{z}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div style={card}>
+            <label style={lbl}>🚦 สถานะ</label>
+            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inp}>
+              {Object.entries(STATUS_META).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* QC Lanes */}
+          <div style={card}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🌡️ QC ลานโหลด</div>
+            {LOADING_LANES.map(l => {
+              const qc = form.qcLanes[l.id] || {};
+              return (
+                <div key={l.id} style={{ borderRadius: 8, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.emoji} {l.tinyLabel}</div>
+                    <button onClick={() => resetQC(l.id)}
+                      style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      ↩ Reset QC
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ flex: "0 0 auto" }}>
+                      <label style={{ ...lbl, marginBottom: 4 }}>อุณหภูมิ (°C)</label>
+                      <input value={qc.temp || ""} onChange={e => setQC(l.id, "temp", e.target.value)}
+                        style={{ ...inp, width: 110 }} placeholder="เช่น -18" />
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, cursor: "pointer", marginTop: 18 }}>
+                      <input type="checkbox" checked={!!qc.done} onChange={e => setQC(l.id, "done", e.target.checked)} style={{ width: 16, height: 16 }} />
+                      QC แล้ว
+                    </label>
+                  </div>
+                  {qc.doneAt && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>บันทึกเมื่อ: {qc.doneAt}</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Load Lanes */}
+          <div style={card}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🏗️ สถานะลานโหลด</div>
+            {LOADING_LANES.map(l => {
+              const ld = form.loadLanes[l.id] || {};
+              return (
+                <div key={l.id} style={{ borderRadius: 8, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.emoji} {l.tinyLabel}</div>
+                    <button onClick={() => resetLoad(l.id)}
+                      style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      ↩ Reset
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 20 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                      <input type="checkbox" checked={!!ld.waiting} onChange={e => setLoad(l.id, "waiting", e.target.checked)} style={{ width: 16, height: 16 }} />
+                      รอสินค้า
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                      <input type="checkbox" checked={!!ld.done} onChange={e => setLoad(l.id, "done", e.target.checked)} style={{ width: 16, height: 16 }} />
+                      โหลดเสร็จ
+                    </label>
+                  </div>
+                  {(ld.waitingAt || ld.doneAt) && (
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+                      {ld.waitingAt && <span>รอ: {ld.waitingAt} </span>}
+                      {ld.doneAt   && <span>เสร็จ: {ld.doneAt}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {msg && <div style={{ textAlign: "center", color: "#10b981", fontWeight: 700, marginBottom: 12, fontSize: 15 }}>{msg}</div>}
+          <button onClick={save}
+            style={{ width: "100%", background: "#111", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
+            💾 บันทึกการแก้ไข
+          </button>
+          <button onClick={() => { if (window.confirm(`ลบรถ ${truck.plate} ออกจากระบบ?`)) onDeleteTruck(truck.id); }}
+            style={{ width: "100%", background: "#fee2e2", color: "#991b1b", border: "1.5px solid #fca5a5", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            🗑️ ลบรถออกจากระบบ (กรณีสแกนทะเบียนผิด)
+          </button>
+        </>
+      )}
     </div>
   );
 };
@@ -1778,45 +2182,131 @@ const LANE_NAME_MAP = {
 };
 const normalizeLaneKey = (raw) => {
   const t = String(raw || "").trim();
-  return LANE_NAME_MAP[t] || null;
+  if (!t) return null;
+  if (LANE_NAME_MAP[t]) return LANE_NAME_MAP[t];
+  // partial match fallback
+  if (t.includes("ชิ้นส่วน")) return "lane_parts";
+  if (t.includes("หัว") || t.includes("เครื่องใน")) return "lane_head";
+  if (t.includes("หมูซีก") || t.includes("ซีก") || t.includes("หมู")) return "lane_pork";
+  return null;
 };
-const normalizeProductCode = (val) => String(val || "").replace(/\.0+$/, "").trim();
+const normalizeProductCode = (val) => String(val || "").replace(/\.0+$/, "").trim().replace(/^0+(\d)/, "$1");
+
+const DETAIL_LS_VER = "v2"; // bump when encoding/format changes — forces re-upload
 
 const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
-  const [srcData,      setSrcData]      = useState({ wet_market: [], modern_trade: [], others: [] });
-  const [masterPreview, setMasterPreview] = useState([]);
-  const [debugInfo,    setDebugInfo]    = useState(null); // raw debug info from last upload
-  const [showDebug,    setShowDebug]    = useState(false);
+  const initSrc = () => {
+    try {
+      if (localStorage.getItem("wh_detail_ver") !== DETAIL_LS_VER) {
+        ["wh_detail_src", "wh_detail_names"].forEach(k => localStorage.removeItem(k));
+        localStorage.setItem("wh_detail_ver", DETAIL_LS_VER);
+        return {};
+      }
+      return JSON.parse(localStorage.getItem("wh_detail_src") || "{}");
+    } catch { return {}; }
+  };
+  const initNames = () => {
+    try { return JSON.parse(localStorage.getItem("wh_detail_names") || "{}"); } catch { return {}; }
+  };
 
-  // Parse source file (col L=index11=customerGroup flag, col U=index20=productCode, col BN=index65=plate)
+  const [srcData,     setSrcData]     = useState(() => ({ wet_market: [], modern_trade: [], others: [], ...initSrc() }));
+  const [fileNames,   setFileNames]   = useState(initNames);
+  const [showDebug,   setShowDebug]   = useState(false);
+  const [masterDebug, setMasterDebug] = useState(null); // { total, parsed, sampleCol3 }
+
+  // On mount: fetch from Supabase (shared), fallback to localStorage
+  useEffect(() => {
+    fetchDetailSrc().then(remote => {
+      if (remote) {
+        const merged = {};
+        const names = { ...initNames() };
+        for (const [srcId, { rows, fileName }] of Object.entries(remote)) {
+          merged[srcId] = rows;
+          if (fileName) names[srcId] = fileName;
+        }
+        setSrcData(prev => {
+          const next = { ...prev, ...merged };
+          localStorage.setItem("wh_detail_src", JSON.stringify(next));
+          return next;
+        });
+        setFileNames(prev => {
+          const next = { ...prev, ...names };
+          localStorage.setItem("wh_detail_names", JSON.stringify(next));
+          return next;
+        });
+        Object.entries(merged).forEach(([srcId, rows]) => {
+          if (rows?.length) onDetailChange(srcId, rows);
+        });
+      } else {
+        const stored = initSrc();
+        Object.entries(stored).forEach(([srcId, rows]) => {
+          if (rows?.length) onDetailChange(srcId, rows);
+        });
+      }
+    });
+
+    const channel = supabase.channel("detail-src-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "wh_master" }, async (payload) => {
+        const row = payload.new;
+        if (!row?.id?.startsWith("detail_")) return;
+        const srcId = row.id.replace(/^detail_/, "");
+        // Re-fetch แทนการอ่านจาก payload เพราะ JSONB ขนาดใหญ่อาจถูกตัดใน realtime
+        const { data: fresh } = await supabase.from("wh_master").select("data").eq("id", row.id).single();
+        const payload2 = fresh?.data || row.data || {};
+        const rows = Array.isArray(payload2) ? payload2 : (payload2.rows || []);
+        const fileName = payload2.file_name || "";
+        setSrcData(prev => {
+          const next = { ...prev, [srcId]: rows };
+          localStorage.setItem("wh_detail_src", JSON.stringify(next));
+          return next;
+        });
+        if (fileName) {
+          setFileNames(prev => {
+            const next = { ...prev, [srcId]: fileName };
+            localStorage.setItem("wh_detail_names", JSON.stringify(next));
+            return next;
+          });
+        }
+        onDetailChange(srcId, rows);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Parse source file (col U=index20=productCode, col BN=index65=plate)
   const parseSourceFile = (file, srcId) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const wb = XLSX.read(ev.target.result, { type: "array", raw: true });
+        let wb;
+        if (/\.csv$/i.test(file.name)) {
+          // CSV with Thai Windows-874 encoding: decode bytes manually
+          const text = new TextDecoder("windows-874").decode(new Uint8Array(ev.target.result));
+          wb = XLSX.read(text, { type: "string" });
+        } else {
+          wb = XLSX.read(ev.target.result, { type: "array", raw: true, codepage: 874 });
+        }
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-        // Debug: show header row and first data row raw values
-        const headerRow = rows[0] || [];
-        const firstData = rows[1] || [];
-        setDebugInfo({
-          type: "source",
-          srcLabel: srcId,
-          totalRows: rows.length - 1,
-          headerColL:  headerRow[11],  headerColU:  headerRow[20],  headerColBN: headerRow[65],
-          sampleColL:  firstData[11],  sampleColU:  firstData[20],  sampleColBN: firstData[65],
-          rawColL_type: typeof firstData[11],
-          rawColU_type: typeof firstData[20],
-          rawColBN_type: typeof firstData[65],
-        });
-        setShowDebug(true);
         const dataRows = rows.slice(1).filter(r => r[65] && String(r[65]).trim() !== "");
         const parsed = dataRows.map(r => ({
           plate:        String(r[65] || "").trim(),
           productCode:  normalizeProductCode(r[20]),
           groupFlag:    String(r[11] || "").trim(),
         })).filter(r => r.plate && r.productCode);
-        setSrcData(prev => ({ ...prev, [srcId]: parsed }));
+
+        setSrcData(prev => {
+          const next = { ...prev, [srcId]: parsed };
+          localStorage.setItem("wh_detail_src", JSON.stringify(next));
+          return next;
+        });
+        setFileNames(prev => {
+          const next = { ...prev, [srcId]: file.name };
+          localStorage.setItem("wh_detail_names", JSON.stringify(next));
+          return next;
+        });
+        supabase.from("wh_master").upsert({ id: `detail_${srcId}`, data: { rows: parsed, file_name: file.name } });
         onDetailChange(srcId, parsed);
       } catch(e) {
         alert("อ่านไฟล์ไม่สำเร็จ: " + e.message);
@@ -1834,11 +2324,22 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
         const dataRows = rows.slice(1).filter(r => r[0] && String(r[0]).trim() !== "" && String(r[0]).trim() !== "SAP");
-        const parsed = dataRows.map(r => ({
+        const mapped = dataRows.map(r => ({
           productCode: normalizeProductCode(r[0]),
           laneKey:     normalizeLaneKey(r[3]),
-        })).filter(r => r.productCode && r.laneKey);
-        setMasterPreview(parsed);
+          rawCol3:     String(r[3] || "").trim(),
+        }));
+        const parsed = mapped.filter(r => r.productCode && r.laneKey);
+        setMasterDebug({
+          total:    dataRows.length,
+          matched:  parsed.length,
+          sampleCol3: [...new Set(mapped.map(r => r.rawCol3))].slice(0, 6),
+        });
+        setFileNames(prev => {
+          const next = { ...prev, master: file.name };
+          localStorage.setItem("wh_detail_names", JSON.stringify(next));
+          return next;
+        });
         onMasterChange(parsed);
       } catch(e) {
         alert("อ่านไฟล์ Master ไม่สำเร็จ: " + e.message);
@@ -1859,12 +2360,6 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
     plateLaneMap[plateKey].add(match.laneKey);
   }
 
-  const srcCounts = DETAIL_SOURCES.map(s => ({
-    ...s,
-    count: srcData[s.id]?.length || 0,
-    plates: [...new Set((srcData[s.id] || []).map(r => r.plate))].length,
-  }));
-
   return (
     <div style={{ padding: 20 }}>
       <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 900 }}>📋 Detail Loading</h2>
@@ -1877,9 +2372,9 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
               <span style={{ fontSize: 28 }}>{src.emoji}</span>
               <div>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>{src.label}</div>
-                {srcData[src.id]?.length > 0 && (
+                {fileNames[src.id] && (
                   <div style={{ fontSize: 11, color: src.color, fontWeight: 700, marginTop: 2 }}>
-                    {srcData[src.id].length} รายการ · {[...new Set(srcData[src.id].map(r => r.plate))].length} คัน
+                    ✅ {fileNames[src.id]}
                   </div>
                 )}
               </div>
@@ -1887,20 +2382,10 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
             <label style={{ display: "block", background: src.bg, color: src.color, border: `1.5px dashed ${src.color}`, borderRadius: 10, padding: "12px 0", textAlign: "center", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" }}
               onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
               onMouseOut={e => e.currentTarget.style.opacity = "1"}>
-              ⬆️ อัปโหลดไฟล์ {src.label}
+              {fileNames[src.id] ? "🔄 เปลี่ยนไฟล์" : "⬆️ อัปโหลดไฟล์"} {src.label}
               <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
                 onChange={e => { if (e.target.files[0]) parseSourceFile(e.target.files[0], src.id); e.target.value = ""; }} />
             </label>
-            {srcData[src.id]?.length > 0 && (
-              <div style={{ marginTop: 10, maxHeight: 120, overflowY: "auto", fontSize: 11, color: "#6b7280" }}>
-                {[...new Set(srcData[src.id].map(r => r.plate))].slice(0, 10).map(p => (
-                  <div key={p} style={{ padding: "2px 0", borderBottom: "1px solid #f3f4f6" }}>🚛 {p}</div>
-                ))}
-                {[...new Set(srcData[src.id].map(r => r.plate))].length > 10 && (
-                  <div style={{ color: "#9ca3af", paddingTop: 4 }}>+{[...new Set(srcData[src.id].map(r => r.plate))].length - 10} คันอื่น...</div>
-                )}
-              </div>
-            )}
           </div>
         ))}
 
@@ -1910,9 +2395,9 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
             <span style={{ fontSize: 28 }}>🗂️</span>
             <div>
               <div style={{ fontWeight: 800, fontSize: 15 }}>Master ลานโหลด</div>
-              {(masterLane || []).length > 0 && (
+              {fileNames.master && (
                 <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
-                  {masterLane.length} รหัสสินค้า (คงอยู่แม้ล้างวัน)
+                  ✅ {fileNames.master}
                 </div>
               )}
             </div>
@@ -1920,21 +2405,15 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
           <label style={{ display: "block", background: "#111", color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", textAlign: "center", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" }}
             onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
             onMouseOut={e => e.currentTarget.style.opacity = "1"}>
-            ⬆️ อัปโหลด / อัปเดต Master
+            {fileNames.master ? "🔄 เปลี่ยน Master" : "⬆️ อัปโหลด Master"}
             <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
               onChange={e => { if (e.target.files[0]) parseMasterFile(e.target.files[0]); e.target.value = ""; }} />
           </label>
-          {(masterLane || []).length > 0 && (
-            <div style={{ marginTop: 10, maxHeight: 120, overflowY: "auto", fontSize: 11, color: "#6b7280" }}>
-              {(masterLane || []).slice(0, 8).map(m => (
-                <div key={m.productCode} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <span>{m.productCode}</span>
-                  <span style={{ color: "#374151", fontWeight: 700 }}>{m.laneKey}</span>
-                </div>
-              ))}
-              {(masterLane || []).length > 8 && (
-                <div style={{ color: "#9ca3af", paddingTop: 4 }}>+{(masterLane || []).length - 8} รายการอื่น...</div>
-              )}
+          {masterDebug && (
+            <div style={{ marginTop: 10, fontSize: 11, padding: "8px 10px", borderRadius: 8, background: masterDebug.matched === 0 ? "#fee2e2" : "#d1fae5", color: masterDebug.matched === 0 ? "#991b1b" : "#065f46" }}>
+              {masterDebug.matched === 0
+                ? <>❌ Match 0/{masterDebug.total} — ค่าใน col D: {masterDebug.sampleCol3.map(v => `"${v}"`).join(", ")}</>
+                : <>✅ Match {masterDebug.matched}/{masterDebug.total} รหัส</>}
             </div>
           )}
         </div>
@@ -1979,6 +2458,36 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
       {Object.keys(plateLaneMap).length === 0 && (masterLane || []).length > 0 && allDetail.length > 0 && (
         <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 12, padding: 20, color: "#92400e", fontWeight: 600, fontSize: 14 }}>
           ⚠️ ไม่พบรหัสสินค้าที่ Match กับ Master — ตรวจสอบว่า Product Code ในไฟล์ตรงกับ Master หรือไม่
+          <button onClick={() => setShowDebug(v => !v)} style={{ marginLeft: 12, background: "#92400e", color: "#fff", border: "none", borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+            {showDebug ? "ซ่อน" : "🔍 ดู Debug"}
+          </button>
+        </div>
+      )}
+
+      {showDebug && (masterLane || []).length > 0 && allDetail.length > 0 && (
+        <div style={{ background: "#1e1e2e", borderRadius: 12, padding: 16, marginTop: 12, fontFamily: "monospace", fontSize: 12 }}>
+          <div style={{ color: "#cba6f7", fontWeight: 700, marginBottom: 8 }}>🔍 Debug: เปรียบเทียบรหัสสินค้า</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <div style={{ color: "#a6e3a1", fontWeight: 700, marginBottom: 4 }}>Master (5 แรก)</div>
+              {(masterLane || []).slice(0, 5).map((m, i) => (
+                <div key={i} style={{ color: "#cdd6f4", padding: "2px 0" }}>
+                  <span style={{ color: "#f9e2af" }}>[{typeof m.productCode}]</span> "{m.productCode}" → {m.laneKey || <span style={{ color: "#f38ba8" }}>null (lane ไม่ match)</span>}
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ color: "#89b4fa", fontWeight: 700, marginBottom: 4 }}>Source (5 แรก)</div>
+              {allDetail.slice(0, 5).map((r, i) => (
+                <div key={i} style={{ color: "#cdd6f4", padding: "2px 0" }}>
+                  <span style={{ color: "#f9e2af" }}>[{typeof r.productCode}]</span> "{r.productCode}" → plate: {r.plate}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ color: "#6c7086", marginTop: 8, fontSize: 11 }}>
+            ถ้า type ต่างกัน (number vs string) หรือ leading zeros หาย → นั่นคือสาเหตุ
+          </div>
         </div>
       )}
 
@@ -1994,15 +2503,34 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────────────────────
-const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue").select("*");  return (data || []).map(r => r.data); };
+const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue").select("*");  return (data || []).map(r => r.data).sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity)); };
 const fetchTrucks = async () => { const { data } = await supabase.from("wh_trucks").select("*"); return (data || []).map(r => r.data); };
-const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*"); return data && data[0] ? (data[0].data || []) : []; };
+const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "master"); return data && data[0] ? (data[0].data || []) : []; };
+const fetchDetailSrc = async () => {
+  const ids = DETAIL_SOURCES.map(s => `detail_${s.id}`);
+  const { data } = await supabase.from("wh_master").select("*").in("id", ids);
+  if (!data || data.length === 0) return null;
+  const result = {};
+  for (const row of data) {
+    const srcId = row.id.replace(/^detail_/, "");
+    const payload = row.data || {};
+    result[srcId] = {
+      rows:     Array.isArray(payload) ? payload : (payload.rows || []),
+      fileName: payload.file_name || "",
+    };
+  }
+  return result;
+};
 
 export default function App() {
+  const isMobile = useIsMobile();
   const [queue,      setQueue]      = useState([]);
   const [trucks,     setTrucks]     = useState([]);
-  const [masterLane, setMasterLane] = useState([]); // product→lane mapping (persistent)
+  const [masterLane, setMasterLane] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wh_master_cache") || "[]"); } catch { return []; }
+  });
   const [detailMap,  setDetailMap]  = useState({}); // plate→Set(lanes) computed
+  const [srcVersion, setSrcVersion] = useState(0);  // bumped when source files change
   const [tab,        setTab]        = useState("dashboard");
   const [dashLane,   setDashLane]   = useState("main");
   const [time,       setTime]       = useState(TIME_NOW());
@@ -2018,7 +2546,12 @@ export default function App() {
   useEffect(() => {
     fetchQueue().then(setQueue);
     fetchTrucks().then(setTrucks);
-    fetchMaster().then(setMasterLane);
+    fetchMaster().then(rows => {
+      if (rows.length > 0) {
+        setMasterLane(rows);
+        localStorage.setItem("wh_master_cache", JSON.stringify(rows));
+      }
+    });
 
     const channel = supabase.channel("app-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "wh_queue" },  () => fetchQueue().then(setQueue))
@@ -2028,17 +2561,12 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Rebuild plate→lanes map whenever master or detail data changes
-  const handleMasterChange = async (rows) => {
-    setMasterLane(rows);
-    await supabase.from("wh_master").upsert({ id: "master", data: rows });
-  };
-
-  const handleDetailChange = (srcId, rows) => {
-    // Recompute full detailMap using latest master
-    setDetailMap(prev => {
-      const newSrc = { ...prev, [srcId]: rows };
-      const allDetail = Object.values(newSrc).flat();
+  // Recompute detailMap whenever masterLane or source files change
+  useEffect(() => {
+    if (!masterLane.length) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem("wh_detail_src") || "{}");
+      const allDetail = Object.values(stored).flat();
       const map = {};
       for (const row of allDetail) {
         const rowCode = normalizeProductCode(row.productCode);
@@ -2048,8 +2576,18 @@ export default function App() {
         if (!map[k]) map[k] = new Set();
         map[k].add(match.laneKey);
       }
-      return map;
-    });
+      setDetailMap(map);
+    } catch {}
+  }, [masterLane, srcVersion]);
+
+  const handleMasterChange = async (rows) => {
+    setMasterLane(rows);
+    localStorage.setItem("wh_master_cache", JSON.stringify(rows));
+    await supabase.from("wh_master").upsert({ id: "master", data: rows });
+  };
+
+  const handleDetailChange = () => {
+    setSrcVersion(v => v + 1);
   };
 
   const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
@@ -2116,11 +2654,16 @@ export default function App() {
     setTrucks(prev => prev.map(t => t.id === id ? updated : t));
   };
 
+  const handleDeleteTruck = async (id) => {
+    await supabase.from("wh_trucks").delete().eq("id", id);
+  };
+
   const handleReset = async () => {
     if (!window.confirm("ล้างข้อมูลทั้งหมดสำหรับวันใหม่?")) return;
-    const archiveDate = queue.length > 0
-      ? parseQueueDateToISO(queue[0].date)
-      : new Date().toISOString().split("T")[0];
+    // archive date = วันรอบงานที่เพิ่งปิด: ก่อนเที่ยง = เมื่อวาน, หลังเที่ยง = วันนี้
+    const _now = new Date();
+    if (_now.getHours() < 12) _now.setDate(_now.getDate() - 1);
+    const archiveDate = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
     await supabase.from("wh_archive").upsert({ archive_date: archiveDate, queue, trucks });
     await supabase.from("wh_queue").delete().neq("id", "");
     await supabase.from("wh_trucks").delete().neq("id", "");
@@ -2167,7 +2710,8 @@ export default function App() {
     { id: "planning",      label: "⑦ Ordering",       icon: "plan"      },
     { id: "detail_loading", label: "⑧ Detail Loading", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
-    { id: "qr",            label: "📱 QR คนขับ", icon: "scan"      },
+    { id: "admin",          label: "⚙️ Admin",          icon: "plan"      },
+    { id: "qr",             label: "📱 QR คนขับ",       icon: "scan"      },
   ];
 
   // ── Driver-only mode ──
@@ -2189,19 +2733,19 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
       <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 80, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 22 }}>🏭</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
+          <span style={{ fontSize: 22, flexShrink: 0 }}>🏭</span>
+          <div style={{ flexShrink: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
           </div>
           <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
-            style={{ marginLeft: 10, background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none" }}>
+            style={{ flex: isMobile ? 1 : "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: isMobile ? "8px 10px" : "6px 12px", fontSize: isMobile ? 14 : 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? 0 : 6 }}>
             {tabs.map(t => {
               const n = badge[t.id] || 0;
               return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
             })}
           </select>
           {tab === "dashboard" && (
-            <div style={{ display: "flex", gap: 2, marginLeft: 10 }}>
+            <div style={{ display: "flex", gap: 2 }}>
               {[
                 { id: "main",       label: "Main",        icon: "chart"    },
                 { id: "lane_parts", label: "ชิ้นส่วน",    icon: "pig_cuts" },
@@ -2211,7 +2755,7 @@ export default function App() {
                 const active = dashLane === l.id;
                 return (
                   <button key={l.id} onClick={() => setDashLane(l.id)}
-                    style={{ background: "transparent", color: active ? "#fff" : "#9ca3af", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "4px 10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    style={{ background: "transparent", color: active ? "#fff" : "#9ca3af", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "4px 10px", fontSize: isMobile ? 12 : 14, fontWeight: 700, cursor: "pointer" }}>
                     {l.label}
                   </button>
                 );
@@ -2219,9 +2763,9 @@ export default function App() {
             </div>
           )}
         </div>
-        <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{TODAY} {headerClock}</div>
+        <div style={{ color: "#f9fafb", fontSize: isMobile ? 13 : 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>
       </div>
-      <div style={{ maxWidth: tab === "dashboard" ? "none" : 960, margin: "0 auto", padding: tab === "dashboard" ? "8px 14px 14px" : "20px 14px 100px" }}>
+      <div style={{ maxWidth: tab === "dashboard" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
         {tab === "qr"        && (
           <div style={{ textAlign: "center", maxWidth: 400, margin: "0 auto", background: "#fff", padding: 30, borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
@@ -2247,7 +2791,7 @@ export default function App() {
         )}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
-        {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
+        {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMap={detailMap} />}
         {tab === "qc"        && <QC trucks={trucks} onUpdate={handleUpdate} />}
         {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
         {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
@@ -2255,6 +2799,7 @@ export default function App() {
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
         {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
+        {tab === "admin"          && <Admin trucks={trucks} queue={queue} onUpdate={handleUpdate} onDeleteTruck={handleDeleteTruck} />}
       </div>
 
       {/* QR Code Modal */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { getCycleDate } from '../utils/cycleDate'
 
 export default function LoadingBay() {
   const [trucks, setTrucks] = useState([])
@@ -14,10 +15,11 @@ export default function LoadingBay() {
   }, [])
 
   async function fetchTrucks() {
+    const cycleDate = await getCycleDate()
     const { data } = await supabase
       .from('trucks')
       .select('*')
-      .eq('Que_Date', new Date().toISOString().split('T')[0])
+      .eq('Que_Date', cycleDate)
       .neq('Status', 'done')
     setTrucks(data || [])
   }

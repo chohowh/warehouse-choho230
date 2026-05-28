@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { getCycleDate } from '../utils/cycleDate'
 
 export default function QC() {
   const [trucks, setTrucks] = useState([])
@@ -9,18 +10,35 @@ export default function QC() {
   const [loadingBay, setLoadingBay] = useState('')
   const [photo, setPhoto] = useState(null)
   const [message, setMessage] = useState('')
+  const [qcRecords, setQcRecords] = useState([])
+  const [deletingId, setDeletingId] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     fetchTrucks()
+    fetchQcRecords()
   }, [])
 
   async function fetchTrucks() {
     const { data } = await supabase
       .from('trucks')
       .select('*')
-      .eq('Que_Date', new Date().toISOString().split('T')[0])
+      .eq('Que_Date', await getCycleDate())
     setTrucks(data || [])
+  }
+
+  async function fetchQcRecords() {
+    const cycleDate = await getCycleDate() // 'YYYY-MM-DD' ของรอบงาน
+    const start = new Date(cycleDate + 'T00:00:00')
+    const end = new Date(cycleDate + 'T00:00:00')
+    end.setDate(end.getDate() + 2) // ครอบคลุมข้ามคืนถึงเช้า
+    const { data } = await supabase
+      .from('qc_records')
+      .select('*')
+      .gte('created_at', start.toISOString())
+      .lt('created_at', end.toISOString())
+      .order('created_at', { ascending: false })
+    setQcRecords(data || [])
   }
 
   async function handleSubmit() {
@@ -53,7 +71,25 @@ export default function QC() {
       setTemperature('')
       setLoadingBay('')
       setPhoto(null)
+      fetchQcRecords()
     }
+  }
+
+  async function handleDelete(record) {
+    if (!window.confirm(`ลบข้อมูล QC ของ ${record.truck_plate} (${record.loading_bay})?`)) return
+    setDeletingId(record.id)
+    const { error } = await supabase.from('qc_records').delete().eq('id', record.id)
+    if (error) {
+      alert('ลบไม่สำเร็จ กรุณาลองใหม่')
+    } else {
+      setQcRecords(prev => prev.filter(r => r.id !== record.id))
+    }
+    setDeletingId(null)
+  }
+
+  function formatTime(iso) {
+    if (!iso) return ''
+    return new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
@@ -117,6 +153,29 @@ export default function QC() {
           บันทึก QC
         </button>
       </div>
+
+      {qcRecords.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-lg font-bold mb-3">รายการ QC วันนี้</h2>
+          <div className="space-y-2">
+            {qcRecords.map(record => (
+              <div key={record.id} className="bg-white rounded-xl p-3 shadow flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm">{record.truck_plate}</div>
+                  <div className="text-xs text-gray-500">{record.loading_bay} · {record.temperature}°C · {formatTime(record.created_at)}</div>
+                </div>
+                <button
+                  onClick={() => handleDelete(record)}
+                  disabled={deletingId === record.id}
+                  className="bg-red-100 text-red-600 text-xs font-bold px-3 py-2 rounded-lg hover:bg-red-200 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {deletingId === record.id ? '...' : '🗑 ลบ'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

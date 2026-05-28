@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { getCycleDate } from '../utils/cycleDate'
 
 export default function LG() {
   const [trucks, setTrucks] = useState([])
@@ -17,11 +18,12 @@ export default function LG() {
   }, [])
 
   async function fetchTrucks() {
+    const cycleDate = await getCycleDate()
     const { data } = await supabase
       .from('trucks')
       .select('*')
       .eq('Status', 'waiting')
-      .eq('Que_Date', new Date().toISOString().split('T')[0])
+      .eq('Que_Date', cycleDate)
     setTrucks(data || [])
   }
 
@@ -30,11 +32,12 @@ export default function LG() {
       setManualMessage('กรุณากรอกข้อมูลให้ครบ')
       return
     }
+    const cycleDate = await getCycleDate()
     const { error } = await supabase.from('trucks').insert({
       Truck_Plate: manualPlate.trim(),
       Truck_Type: manualType,
       Status: 'waiting',
-      Que_Date: new Date().toISOString().split('T')[0]
+      Que_Date: cycleDate
     })
     if (error) {
       setManualMessage('เกิดข้อผิดพลาด: ' + error.message)
