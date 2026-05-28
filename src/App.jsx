@@ -492,8 +492,9 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 12, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: import.meta.env.DEV ? "1fr" : "120px 1fr", gap: 12, alignItems: "start" }}>
         {/* Left: sticky stat cards */}
+        {!import.meta.env.DEV && (
         <div style={{ position: "sticky", top: 100, alignSelf: "start", display: "flex", flexDirection: "column", gap: 10 }}>
           {stats.map(s => (
             <div key={s.label} style={{ background: "#fff", borderRadius: 12, padding: "12px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${s.color}` }}>
@@ -503,6 +504,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
             </div>
           ))}
         </div>
+        )}
 
         {/* Right: truck table */}
         <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
@@ -1751,9 +1753,10 @@ const normalizeLaneKey = (raw) => {
 const normalizeProductCode = (val) => String(val || "").replace(/\.0+$/, "").trim();
 
 const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
-  const [srcData, setSrcData] = useState({ wet_market: [], modern_trade: [], others: [] });
+  const [srcData,      setSrcData]      = useState({ wet_market: [], modern_trade: [], others: [] });
   const [masterPreview, setMasterPreview] = useState([]);
-  const [activeUpload, setActiveUpload] = useState(null); // which source is uploading
+  const [debugInfo,    setDebugInfo]    = useState(null); // raw debug info from last upload
+  const [showDebug,    setShowDebug]    = useState(false);
 
   // Parse source file (col L=index11=customerGroup flag, col U=index20=productCode, col BN=index65=plate)
   const parseSourceFile = (file, srcId) => {
@@ -1763,12 +1766,25 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
         const wb = XLSX.read(ev.target.result, { type: "array", raw: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-        // Find header row (row with col BN header - usually row 0)
+        // Debug: show header row and first data row raw values
+        const headerRow = rows[0] || [];
+        const firstData = rows[1] || [];
+        setDebugInfo({
+          type: "source",
+          srcLabel: srcId,
+          totalRows: rows.length - 1,
+          headerColL:  headerRow[11],  headerColU:  headerRow[20],  headerColBN: headerRow[65],
+          sampleColL:  firstData[11],  sampleColU:  firstData[20],  sampleColBN: firstData[65],
+          rawColL_type: typeof firstData[11],
+          rawColU_type: typeof firstData[20],
+          rawColBN_type: typeof firstData[65],
+        });
+        setShowDebug(true);
         const dataRows = rows.slice(1).filter(r => r[65] && String(r[65]).trim() !== "");
         const parsed = dataRows.map(r => ({
           plate:        String(r[65] || "").trim(),
-          productCode:  String(r[20] || "").trim(),
-          groupFlag:    String(r[11] || "").trim(), // 250=WetMarket, 923=non-WetMarket
+          productCode:  normalizeProductCode(r[20]),
+          groupFlag:    String(r[11] || "").trim(),
         })).filter(r => r.plate && r.productCode);
         setSrcData(prev => ({ ...prev, [srcId]: parsed }));
         onDetailChange(srcId, parsed);
@@ -2134,41 +2150,6 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-      <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 22 }}>🏭</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.2 }}>Factory Loading System</div>
-            <div style={{ fontSize: 10, color: "#9ca3af" }}>{TODAY}</div>
-          </div>
-          <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
-            style={{ marginLeft: 10, background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none" }}>
-            {tabs.map(t => {
-              const n = badge[t.id] || 0;
-              return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
-            })}
-          </select>
-          {tab === "dashboard" && (
-            <div style={{ display: "flex", gap: 2, marginLeft: 10 }}>
-              {[
-                { id: "main",       label: "Main",        icon: "chart"    },
-                { id: "lane_parts", label: "ชิ้นส่วน",    icon: "pig_cuts" },
-                { id: "lane_head",  label: "หัว/เครื่องใน", icon: "pig_head" },
-                { id: "lane_pork",  label: "หมูซีก",      icon: "pig_side" },
-              ].map(l => {
-                const active = dashLane === l.id;
-                return (
-                  <button key={l.id} onClick={() => setDashLane(l.id)}
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, background: active ? "#f9fafb" : "transparent", color: active ? "#111" : "#9ca3af", border: "none", borderRadius: 10, padding: "5px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer", minWidth: 44, lineHeight: 1.3 }}>
-                    <Icon name={l.icon} size={18} />
-                    {l.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
       <div style={{ maxWidth: tab === "dashboard" ? "none" : 960, margin: "0 auto", padding: tab === "dashboard" ? "8px 14px 14px" : "20px 14px 100px" }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
         {tab === "qr"        && (
