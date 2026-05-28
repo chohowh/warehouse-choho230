@@ -2731,15 +2731,14 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-      <div style={{ background: "#111", color: "#fff", padding: isMobile ? "8px 14px" : "0 14px", position: "sticky", top: 0, zIndex: 100, minHeight: 80, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        {/* แถว 1: โลโก้ + ชื่อ + dropdown + (desktop: lane buttons + เวลา) */}
+      <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 80, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22, flexShrink: 0 }}>🏭</span>
           <div style={{ flexShrink: 0 }}>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
           </div>
           <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
-            style={{ flex: isMobile ? 1 : "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: isMobile ? 13 : 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? 0 : 6 }}>
+            style={{ flex: isMobile ? 1 : "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? 0 : 6 }}>
             {tabs.map(t => {
               const n = badge[t.id] || 0;
               return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
@@ -2763,32 +2762,8 @@ export default function App() {
               })}
             </div>
           )}
-          {!isMobile && <div style={{ marginLeft: "auto", color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{TODAY} {headerClock}</div>}
         </div>
-        {/* แถว 2 (mobile only): lane buttons + เวลา */}
-        {isMobile && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-            {tab === "dashboard" ? (
-              <div style={{ display: "flex", gap: 2 }}>
-                {[
-                  { id: "main",       label: "Main"          },
-                  { id: "lane_parts", label: "ชิ้นส่วน"      },
-                  { id: "lane_head",  label: "หัว/ใน"        },
-                  { id: "lane_pork",  label: "หมูซีก"        },
-                ].map(l => {
-                  const active = dashLane === l.id;
-                  return (
-                    <button key={l.id} onClick={() => setDashLane(l.id)}
-                      style={{ background: "transparent", color: active ? "#fff" : "#9ca3af", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "4px 8px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                      {l.label}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : <div />}
-            <div style={{ color: "#9ca3af", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{headerClock}</div>
-          </div>
-        )}
+        <div style={{ color: "#f9fafb", fontSize: isMobile ? 12 : 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{headerClock}</div>
       </div>
       <div style={{ maxWidth: tab === "dashboard" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
