@@ -2736,6 +2736,7 @@ export default function App() {
           <span style={{ fontSize: 22, flexShrink: 0 }}>🏭</span>
           <div style={{ flexShrink: 0 }}>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
+            {isMobile && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{TODAY} {headerClock}</div>}
           </div>
           <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
             style={{ flex: isMobile ? 1 : "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? 0 : 6 }}>
@@ -2763,7 +2764,7 @@ export default function App() {
             </div>
           )}
         </div>
-        <div style={{ color: "#f9fafb", fontSize: isMobile ? 12 : 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{headerClock}</div>
+        {!isMobile && <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
       </div>
       <div style={{ maxWidth: tab === "dashboard" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
