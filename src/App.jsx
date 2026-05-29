@@ -378,7 +378,7 @@ const parseExitDatetime = (dateStr, timeStr) => {
   return d;
 };
 
-const TimeBar = ({ exitTime, date, done, invoicedAt, fs }) => {
+const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 20 : 11 }}>—</span>;
   const exitDt = parseExitDatetime(date, exitTime);
   const remaining = exitDt ? Math.round((exitDt - Date.now()) / 60000) : 0;
@@ -401,7 +401,7 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs }) => {
     <div>
       <div style={{ fontSize: 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
       <div style={{ fontSize: 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
-      <div style={{ marginTop: 4, height: 6, borderRadius: 0, marginLeft: -114, width: "calc(100% + 114px)", background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
+      <div style={{ marginTop: 4, height: 6, borderRadius: card ? 3 : 0, ...(card ? {} : { marginLeft: -114, width: "calc(100% + 114px)" }), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
 };
@@ -534,7 +534,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                     </div>
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} />
+                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     {!truck
