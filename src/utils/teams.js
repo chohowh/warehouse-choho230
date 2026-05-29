@@ -33,7 +33,7 @@ export const sendTeamsNotification = async (title, details, imageUrls = []) => {
     };
 
     const images = Array.isArray(imageUrls) ? imageUrls : (imageUrls ? [imageUrls] : []);
-    
+
     if (images.length > 0) {
       if (images.length === 1) {
         card.attachments[0].content.body.push({
@@ -49,8 +49,8 @@ export const sendTeamsNotification = async (title, details, imageUrls = []) => {
         card.attachments[0].content.body.push({
           type: "ImageSet",
           imageSize: "Medium",
-          images: images.map(url => ({ 
-            type: "Image", 
+          images: images.map(url => ({
+            type: "Image",
             url,
             selectAction: {
               type: "Action.OpenUrl",
@@ -59,8 +59,7 @@ export const sendTeamsNotification = async (title, details, imageUrls = []) => {
           }))
         });
       }
-      
-      // Add explicit buttons because Teams mobile often ignores selectAction on images
+
       card.attachments[0].content.body.push({
         type: "ActionSet",
         actions: images.map((url, index) => ({
@@ -73,9 +72,7 @@ export const sendTeamsNotification = async (title, details, imageUrls = []) => {
 
     const response = await fetch(TEAMS_WEBHOOK_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(card),
     });
 

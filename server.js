@@ -1,5 +1,6 @@
 import express from 'express';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -18,19 +19,16 @@ function loadEnvFile(path) {
   } catch {}
 }
 
-// Load env files: .env.[mode] → .env (same priority as Vite)
 loadEnvFile(`.env.${NODE_ENV}`);
 loadEnvFile('.env');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
 
-// Serve React build
 app.use(express.static('dist'));
 
-// SPA fallback
 app.get(/^(?!\/api).*$/, (req, res) => {
-  res.sendFile(new URL('./dist/index.html', import.meta.url).pathname);
+  res.sendFile(fileURLToPath(new URL('./dist/index.html', import.meta.url)));
 });
 
 const PORT = process.env.PORT || 3001;
