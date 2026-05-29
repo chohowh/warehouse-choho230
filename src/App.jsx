@@ -486,20 +486,20 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
           onChange={e => setSearchPlate(e.target.value)}
           style={{ marginLeft: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: "5px 10px", fontSize: 12, width: 180, outline: "none", display: fs ? "none" : undefined }}
         />
-        <button
+        {!isMobile && <button
           onClick={toggleFullscreen}
           title={isFullscreen && !isTvMode ? "ย่อหน้าต่าง (Esc)" : "ขยายเต็มจอ (Desktop)"}
           style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", cursor: "pointer", padding: "4px 8px", fontSize: 15, lineHeight: 1, color: "#374151", flexShrink: 0, display: fs ? "none" : "flex", alignItems: "center", justifyContent: "center" }}
         >
           {isFullscreen && !isTvMode ? "✕" : "⛶"}
-        </button>
-        <button
+        </button>}
+        {!isMobile && <button
           onClick={toggleTvMode}
           title={fs ? "ออกจากโหมด TV" : "โหมด Smart TV"}
           style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "10px 18px" : "4px 8px", fontSize: fs ? 30 : 15, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
         >
           {fs ? "✕" : "📺"}
-        </button>
+        </button>}
       </div>
       {visibleRows.length === 0
         ? <div style={{ padding: fs ? 80 : 36, textAlign: "center", color: "#9ca3af", fontSize: fs ? 28 : 14 }}>
