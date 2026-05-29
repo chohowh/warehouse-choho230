@@ -2643,12 +2643,6 @@ export default function App() {
 
     const actualTime = TIME_NOW();
     const diffStr = calcTimeDiffStr(t.entryTime, actualTime);
-    sendTeamsNotification(`🚛 รถ ${t.plate} เช็คอินเข้าโรงงานแล้ว`, {
-      "ทะเบียน": t.plate,
-      "กลุ่มลูกค้า": t.customerGroup,
-      "เวลา STD": t.entryTime || "-",
-      "เวลาเข้าจริง": `${actualTime} ${diffStr}`
-    });
   };
 
   const handleUpdate = async (id, upd) => {
