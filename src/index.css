@@ -19,3 +19,11 @@
 @media (min-width: 769px) {
   .mobile-only  { display: none !important; }
 }
+
+@media print {
+  body { background: #fff !important; }
+  /* Hide nav/header when printing QR page */
+  header, nav, select, button, input { display: none !important; }
+  /* Show only the QR grid */
+  .qr-print-area { display: block !important; }
+}
