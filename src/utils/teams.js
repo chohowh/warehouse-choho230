@@ -1,6 +1,7 @@
 const TEAMS_WEBHOOK_URL = import.meta.env.VITE_TEAMS_WEBHOOK_URL || '';
 
 export const sendTeamsNotification = async (title, details, imageUrls = []) => {
+  console.log('[Teams] URL:', TEAMS_WEBHOOK_URL ? 'SET' : 'EMPTY', '| title:', title);
   if (!TEAMS_WEBHOOK_URL) return;
   try {
     const facts = Object.entries(details).map(([title, value]) => ({ title, value }));
