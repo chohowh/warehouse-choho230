@@ -487,8 +487,8 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
   return (
     <div ref={containerRef} style={{ display: "flex", flexDirection: "column", height: "100%", background: "#fff" }}>
       <div style={{ padding: fs ? "10px 24px" : "10px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: fs ? 26 : 14, whiteSpace: "nowrap" }}>
-          🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "3px 12px" : "2px 8px", fontSize: fs ? 20 : 11, marginLeft: 4 }}>{allRows.length}</span>
+        <span style={{ fontWeight: 700, fontSize: fs ? 18 : 14, whiteSpace: "nowrap" }}>
+          🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "2px 8px" : "2px 8px", fontSize: fs ? 14 : 11, marginLeft: 4 }}>{allRows.length}</span>
         </span>
         <div style={{ flex: 1 }} />
         <input
