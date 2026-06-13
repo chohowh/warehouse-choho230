@@ -379,7 +379,7 @@ const parseExitDatetime = (dateStr, timeStr) => {
 };
 
 const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
-  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 20 : 11 }}>—</span>;
+  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 15 : 11 }}>—</span>;
   const exitDt = parseExitDatetime(date, exitTime);
   const remaining = exitDt ? Math.round((exitDt - Date.now()) / 60000) : 0;
   const totalWindow = 240;
@@ -388,8 +388,8 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   if (done) {
     return (
       <div>
-        <div style={{ fontSize: fs ? 20 : 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
-        {invoicedAt && <div style={{ fontSize: fs ? 16 : 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
+        <div style={{ fontSize: fs ? 15 : 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
+        {invoicedAt && <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
       </div>
     );
   }
@@ -480,14 +480,14 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
     }
   };
   const fs = isTvMode;
-  const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: fs ? 28 : 13 }}>✓</span>;
-  const Dash = () => <span style={{ color: "#d1d5db", fontSize: fs ? 26 : 12 }}>—</span>;
-  const tdP = fs ? "22px 32px" : "10px 12px";
+  const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: fs ? 20 : 13 }}>✓</span>;
+  const Dash = () => <span style={{ color: "#d1d5db", fontSize: fs ? 18 : 12 }}>—</span>;
+  const tdP = fs ? "10px 20px" : "10px 12px";
   return (
     <div ref={containerRef} style={{ display: "flex", flexDirection: "column", height: "100%", background: "#fff" }}>
-      <div style={{ padding: fs ? "20px 36px" : "10px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: fs ? 36 : 14, whiteSpace: "nowrap" }}>
-          🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "6px 18px" : "2px 8px", fontSize: fs ? 28 : 11, marginLeft: 4 }}>{allRows.length}</span>
+      <div style={{ padding: fs ? "10px 24px" : "10px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: fs ? 26 : 14, whiteSpace: "nowrap" }}>
+          🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "3px 12px" : "2px 8px", fontSize: fs ? 20 : 11, marginLeft: 4 }}>{allRows.length}</span>
         </span>
         <input
           type="text"
@@ -506,13 +506,13 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
         {!isMobile && <button
           onClick={toggleTvMode}
           title={fs ? "ออกจากโหมด TV" : "โหมด Smart TV"}
-          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "10px 18px" : "4px 8px", fontSize: fs ? 30 : 15, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "6px 12px" : "4px 8px", fontSize: fs ? 22 : 15, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
         >
           {fs ? "✕" : "📺"}
         </button>}
       </div>
       {visibleRows.length === 0
-        ? <div style={{ padding: fs ? 80 : 36, textAlign: "center", color: "#9ca3af", fontSize: fs ? 28 : 14 }}>
+        ? <div style={{ padding: fs ? 40 : 36, textAlign: "center", color: "#9ca3af", fontSize: fs ? 20 : 14 }}>
             {searchPlate.trim() ? `ไม่พบทะเบียน "${searchPlate}"` : "ยังไม่มีรถเข้าโรงงาน"}
           </div>
         : isMobile && !fs
@@ -565,14 +565,14 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
             })}
           </div>
         : <div style={{ overflowX: "auto", overflowY: "auto", flex: 1, maxHeight: fs ? undefined : "calc(100vh - 170px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs ? 26 : 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs ? 18 : 12 }}>
               <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr style={{ background: "#f9fafb" }}>
                   {(fs
                     ? [{l:"ทะเบียน",w:140},{l:"เวลาเข้าโรงงาน",w:200},{l:"เวลาออกจากโรงงาน",w:340},{l:"สถานะ",w:"auto"}]
                     : [{l:"ทะเบียน",w:60},{l:"กลุ่มลูกค้า",w:100},{l:"เวลาเข้าโรงงาน",w:90},{l:"เวลาออกจากโรงงาน",w:200},{l:"สถานะ",w:"auto"},{l:"ใบเบิกสินค้า",w:60},{l:"ใบสรุปจ่าย",w:60},{l:"ใบ Invoice",w:60}]
                   ).map(h => (
-                    <th key={h.l} style={{ width: h.w, padding: fs ? "20px 32px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", fontSize: fs ? 22 : undefined }}>{h.l}</th>
+                    <th key={h.l} style={{ width: h.w, padding: fs ? "10px 20px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", fontSize: fs ? 16 : undefined }}>{h.l}</th>
                   ))}
                 </tr>
               </thead>
@@ -582,40 +582,40 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                   const urgent = rem < 20 && truck?.status !== "invoiced";
                   return (
                     <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 30 : undefined }}>{plate}</td>
+                      <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 22 : undefined }}>{plate}</td>
                       {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
                       <td style={{ padding: tdP, whiteSpace: "nowrap" }}>
                         <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
                         {truck?.arrivedAt
-                          ? <div style={{ fontSize: fs ? 18 : 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
-                          : <div style={{ fontSize: fs ? 18 : 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
+                          ? <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
+                          : <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
                       </td>
                       <td style={{ padding: tdP }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={fs} /></td>
                       <td style={{ padding: tdP }}>
                         {!truck
-                          ? <span style={{ fontSize: fs ? 24 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
+                          ? <span style={{ fontSize: fs ? 16 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
                           : (() => {
                               const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
-                              if (!anyQC) return <span style={{ fontSize: fs ? 24 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
+                              if (!anyQC) return <span style={{ fontSize: fs ? 16 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
                               return (
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 10 : 4 }}>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 6 : 4 }}>
                                   {LOADING_LANES.map(l => {
                                     const loaded = truck.loadLanes?.[l.id]?.done;
                                     const qcDone = truck.qcLanes?.[l.id]?.done;
                                     const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
                                     if (loaded) return (
-                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 12, padding: fs ? "8px 20px 10px 18px" : "3px 10px 5px 8px", fontSize: fs ? 22 : 11, fontWeight: 700, lineHeight: 1.4 }}>
+                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 12, padding: fs ? "5px 14px 7px 12px" : "3px 10px 5px 8px", fontSize: fs ? 16 : 11, fontWeight: 700, lineHeight: 1.4 }}>
                                         {l.tinyLabel}
-                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: fs ? 24 : 14, height: fs ? 24 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 13 : 8, fontWeight: 900 }}>✓</span>
+                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: fs ? 18 : 14, height: fs ? 18 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 10 : 8, fontWeight: 900 }}>✓</span>
                                       </div>
                                     );
                                     if (waiting) return (
-                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 12, padding: fs ? "8px 20px 10px 18px" : "3px 10px 5px 8px", fontSize: fs ? 22 : 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
+                                      <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 12, padding: fs ? "5px 14px 7px 12px" : "3px 10px 5px 8px", fontSize: fs ? 16 : 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
                                         รอสินค้า {l.tinyLabel}
-                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: fs ? 24 : 14, height: fs ? 24 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 13 : 8 }}>⏳</span>
+                                        <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: fs ? 18 : 14, height: fs ? 18 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 10 : 8 }}>⏳</span>
                                       </div>
                                     );
-                                    if (qcDone) return <span key={l.id} style={{ fontSize: fs ? 22 : 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>;
+                                    if (qcDone) return <span key={l.id} style={{ fontSize: fs ? 16 : 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>;
                                     return null;
                                   })}
                                 </div>
@@ -624,7 +624,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                         }
                         {truck?.extraStatus && (
                           <div style={{ marginTop: 4 }}>
-                            <span style={{ display: "inline-block", background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: fs ? "6px 16px" : "2px 8px", fontSize: fs ? 20 : 10, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>
+                            <span style={{ display: "inline-block", background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: fs ? "3px 10px" : "2px 8px", fontSize: fs ? 14 : 10, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>
                           </div>
                         )}
                       </td>
