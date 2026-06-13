@@ -397,12 +397,12 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
   const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
   const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
-  const contained = card || fs;
+  const barExtend = card ? null : fs ? { marginLeft: -240, width: "calc(100% + 240px)" } : { marginLeft: -114, width: "calc(100% + 114px)" };
   return (
     <div>
       <div style={{ fontSize: fs ? 16 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
       <div style={{ fontSize: fs ? 13 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
-      <div style={{ marginTop: 4, height: fs ? 10 : 6, borderRadius: contained ? 3 : 0, ...(contained ? {} : { marginLeft: -114, width: "calc(100% + 114px)" }), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
+      <div style={{ marginTop: 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
 };
