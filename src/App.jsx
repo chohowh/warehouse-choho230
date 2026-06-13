@@ -397,11 +397,12 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
   const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
   const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
+  const contained = card || fs;
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
-      <div style={{ fontSize: 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
-      <div style={{ marginTop: 4, height: 6, borderRadius: card ? 3 : 0, ...(card ? {} : { marginLeft: -114, width: "calc(100% + 114px)" }), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
+      <div style={{ fontSize: fs ? 16 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
+      <div style={{ fontSize: fs ? 13 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
+      <div style={{ marginTop: 4, height: fs ? 10 : 6, borderRadius: contained ? 3 : 0, ...(contained ? {} : { marginLeft: -114, width: "calc(100% + 114px)" }), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
 };
@@ -489,12 +490,13 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
         <span style={{ fontWeight: 700, fontSize: fs ? 26 : 14, whiteSpace: "nowrap" }}>
           🚛 รถในโรงงานวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 10, padding: fs ? "3px 12px" : "2px 8px", fontSize: fs ? 20 : 11, marginLeft: 4 }}>{allRows.length}</span>
         </span>
+        <div style={{ flex: 1 }} />
         <input
           type="text"
           placeholder="🔍 ค้นหาทะเบียน..."
           value={searchPlate}
           onChange={e => setSearchPlate(e.target.value)}
-          style={{ marginLeft: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: "5px 10px", fontSize: 12, width: 180, outline: "none", display: fs ? "none" : undefined }}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "5px 10px", fontSize: 12, width: 180, outline: "none", display: fs ? "none" : undefined, marginRight: 4 }}
         />
         {!isMobile && <button
           onClick={toggleFullscreen}
