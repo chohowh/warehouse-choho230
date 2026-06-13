@@ -402,7 +402,7 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
     <div>
       <div style={{ fontSize: fs ? 16 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
       <div style={{ fontSize: fs ? 13 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
-      <div style={{ marginTop: 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
+      <div style={{ marginTop: fs ? 10 : 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
 };
