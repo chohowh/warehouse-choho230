@@ -397,7 +397,7 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
   const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
   const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
-  const barExtend = card ? null : fs ? { marginLeft: -220, width: "calc(100% + 220px)" } : { marginLeft: -114, width: "calc(100% + 114px)" };
+  const barExtend = card ? null : fs ? { marginLeft: -180, width: "calc(100% + 180px)" } : { marginLeft: -114, width: "calc(100% + 114px)" };
   return (
     <div>
       <div style={{ fontSize: fs ? 16 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
@@ -571,7 +571,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
               <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr style={{ background: "#f9fafb" }}>
                   {(fs
-                    ? [{l:"ทะเบียน",w:140},{l:"เวลาเข้าโรงงาน",w:200},{l:"เวลาออกจากโรงงาน",w:340},{l:"สถานะ",w:"auto"}]
+                    ? [{l:"ทะเบียน",w:140},{l:"เวลาเข้าโรงงาน",w:160},{l:"เวลาออกจากโรงงาน",w:270},{l:"สถานะ",w:"auto"}]
                     : [{l:"ทะเบียน",w:60},{l:"กลุ่มลูกค้า",w:100},{l:"เวลาเข้าโรงงาน",w:90},{l:"เวลาออกจากโรงงาน",w:200},{l:"สถานะ",w:"auto"},{l:"ใบเบิกสินค้า",w:60},{l:"ใบสรุปจ่าย",w:60},{l:"ใบ Invoice",w:60}]
                   ).map(h => (
                     <th key={h.l} style={{ width: h.w, padding: fs ? "10px 20px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", fontSize: fs ? 16 : undefined }}>{h.l}</th>
