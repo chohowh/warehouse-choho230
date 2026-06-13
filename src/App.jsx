@@ -587,7 +587,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                       <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 22 : undefined }}>{plate}</td>
                       {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
                       <td style={{ padding: tdP, whiteSpace: "nowrap" }}>
-                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
+                        <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: fs ? 16 : 13 }}>{entryTime || "—"}</div>
                         {truck?.arrivedAt
                           ? <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
                           : <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
