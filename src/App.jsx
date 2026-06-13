@@ -586,13 +586,13 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                     <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
                       <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 22 : undefined }}>{plate}</td>
                       {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
-                      <td style={{ padding: tdP, whiteSpace: "nowrap" }}>
-                        <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: fs ? 16 : 13 }}>{entryTime || "—"}</div>
+                      <td style={{ padding: tdP, whiteSpace: "nowrap", verticalAlign: "top" }}>
+                        <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: fs ? 16 : 13, lineHeight: "18px" }}>{entryTime || "—"}</div>
                         {truck?.arrivedAt
-                          ? <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
-                          : <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
+                          ? <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>เข้าจริง {truck.arrivedAt}</div>
+                          : <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>(รถยังไม่เข้าโรงงาน)</div>}
                       </td>
-                      <td style={{ padding: tdP }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={fs} /></td>
+                      <td style={{ padding: tdP, verticalAlign: "top" }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={fs} /></td>
                       <td style={{ padding: tdP }}>
                         {!truck
                           ? <span style={{ fontSize: fs ? 16 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
