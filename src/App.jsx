@@ -21,6 +21,7 @@ const useIsNarrow = () => {
 };
 import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
+import { uploadToR2 } from "./lib/r2";
 import { sendTeamsNotification } from "./utils/teams";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,10 +98,8 @@ async function uploadPhotos(folder, plate, photos) {
     const blob = await fetch(photos[i]).then(r => r.blob());
     const ext = blob.type.split("/")[1] || "jpg";
     const path = `${folder}/${DATE_STR()}/${safePlate(plate)}/${ts}_${i}.${ext}`;
-    const { error } = await supabase.storage.from("truck-photos").upload(path, blob);
-    if (error) throw new Error(error.message);
-    const { data } = supabase.storage.from("truck-photos").getPublicUrl(path);
-    urls.push(data.publicUrl);
+    const url = await uploadToR2(path, blob);
+    urls.push(url);
   }
   return urls;
 }

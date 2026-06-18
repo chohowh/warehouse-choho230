@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { uploadToR2 } from '../lib/r2'
 import { useNavigate } from 'react-router-dom'
 import { getCycleDate } from '../utils/cycleDate'
 
@@ -29,22 +30,19 @@ export default function LoadingBay() {
       setMessage('กรุณาเลือกรถและถ่ายรูปก่อน')
       return
     }
-    const fileName = `${Date.now()}_${photo.name}`
-    const { error: uploadError } = await supabase.storage
-      .from('loading-photos')
-      .upload(fileName, photo)
-    if (uploadError) {
+    const path = `loading/${Date.now()}_${photo.name}`
+    let photoUrl
+    try {
+      photoUrl = await uploadToR2(path, photo)
+    } catch {
       setMessage('อัปโหลดรูปไม่สำเร็จ')
       return
     }
-    const { data: urlData } = supabase.storage
-      .from('loading-photos')
-      .getPublicUrl(fileName)
     const truck = trucks.find(t => t.Truck_Plate === selectedTruck)
     const { error } = await supabase.from('loading_records').insert({
       truck_plate: selectedTruck,
       loading_bay: truck?.Loading_Bay,
-      photo_url: urlData.publicUrl
+      photo_url: photoUrl
     })
     if (!error) {
       await supabase

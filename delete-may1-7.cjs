@@ -6,9 +6,10 @@ const supabase = createClient(
 );
 
 const BUCKET = 'truck-photos';
-const TARGET_MONTH = '2026-04';
-
-// top-level folders ตามโค้ด
+const TARGET_DATES = [
+  '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04',
+  '2026-05-05', '2026-05-06', '2026-05-07',
+];
 const TOP_FOLDERS = ['qc', 'loading/lane_parts', 'loading/lane_head', 'loading/lane_pork'];
 
 async function listFiles(prefix) {
@@ -17,18 +18,18 @@ async function listFiles(prefix) {
   return data || [];
 }
 
-async function deleteAprilFiles() {
-  console.log(`\n🔍 กำลังหาไฟล์เดือน ${TARGET_MONTH}...`);
+async function deleteMay1to7() {
+  console.log('\n🔍 กำลังหาไฟล์วันที่ 1-7 พ.ค. 2026...');
   let totalDeleted = 0;
 
   for (const topFolder of TOP_FOLDERS) {
     const dates = await listFiles(topFolder);
-    const aprilDates = dates.filter(d => d.name.startsWith(TARGET_MONTH));
+    const targetDates = dates.filter(d => TARGET_DATES.includes(d.name));
 
-    if (aprilDates.length === 0) continue;
-    console.log(`\n📁 ${topFolder}: พบ ${aprilDates.length} วัน`);
+    if (targetDates.length === 0) continue;
+    console.log(`\n📁 ${topFolder}: พบ ${targetDates.length} วัน`);
 
-    for (const dateFolder of aprilDates) {
+    for (const dateFolder of targetDates) {
       const datePath = `${topFolder}/${dateFolder.name}`;
       const plates = await listFiles(datePath);
 
@@ -52,4 +53,4 @@ async function deleteAprilFiles() {
   console.log(`\n✅ ลบทั้งหมด ${totalDeleted} ไฟล์`);
 }
 
-deleteAprilFiles();
+deleteMay1to7();

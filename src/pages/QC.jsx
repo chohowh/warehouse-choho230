@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { uploadToR2 } from '../lib/r2'
 import { useNavigate } from 'react-router-dom'
 import { getCycleDate } from '../utils/cycleDate'
 
@@ -46,22 +47,19 @@ export default function QC() {
       setMessage('กรุณากรอกข้อมูลให้ครบ')
       return
     }
-    const fileName = `${Date.now()}_${photo.name}`
-    const { error: uploadError } = await supabase.storage
-      .from('qc-photos')
-      .upload(fileName, photo)
-    if (uploadError) {
+    const path = `qc/${Date.now()}_${photo.name}`
+    let photoUrl
+    try {
+      photoUrl = await uploadToR2(path, photo)
+    } catch {
       setMessage('อัปโหลดรูปไม่สำเร็จ')
       return
     }
-    const { data: urlData } = supabase.storage
-      .from('qc-photos')
-      .getPublicUrl(fileName)
     const { error } = await supabase.from('qc_records').insert({
       truck_plate: selectedTruck,
       temperature: parseFloat(temperature),
       loading_bay: loadingBay,
-      photo_url: urlData.publicUrl
+      photo_url: photoUrl
     })
     if (error) {
       setMessage('เกิดข้อผิดพลาด กรุณาลองใหม่')
