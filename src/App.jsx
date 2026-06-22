@@ -263,7 +263,7 @@ const PrintModal = ({ truck, type, onClose }) => {
         {type === "summary" && truck.qcLanes && (
           <div style={{ borderTop: "1px dashed #aaa", paddingTop: 10 }}>
             <b>อุณหภูมิ QC:</b>
-            {LOADING_LANES.map(l => <div key={l.id}> {l.emoji} {l.shortLabel}: {truck.qcLanes[l.id]?.temp || "–"}°C</div>)}
+            {LOADING_LANES.map(l => <div key={l.id}>{l.shortLabel}: {truck.qcLanes[l.id]?.temp || "–"}°C</div>)}
           </div>
         )}
         {type === "invoice" && (
@@ -507,9 +507,9 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
         {!isMobile && <button
           onClick={toggleTvMode}
           title={fs ? "ออกจากโหมด TV" : "โหมด Smart TV"}
-          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "6px 12px" : "4px 8px", fontSize: fs ? 22 : 15, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: fs ? "#111" : "#f9fafb", cursor: "pointer", padding: fs ? "6px 12px" : "4px 8px", fontSize: fs ? 22 : 15, fontWeight: 800, lineHeight: 1, color: fs ? "#fff" : "#374151", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginLeft: fs ? "auto" : undefined }}
         >
-          {fs ? "✕" : "📺"}
+          {fs ? "✕" : "TV"}
         </button>}
       </div>
       {visibleRows.length === 0
@@ -1441,9 +1441,9 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
 };
 
 // ── 4. QC (per-lane) ──────────────────────────────────────────────────────────
-const QC = ({ trucks, onUpdate }) => {
+const QC = ({ trucks, onUpdate, laneId }) => {
   const [selId,     setSelId]     = useState("");
-  const [lane,      setLane]      = useState("lane_parts");
+  const lane = laneId;
   const [temp,      setTemp]      = useState("");
   const [photo,     setPhoto]     = useState(null);
   const [flashLane, setFlashLane] = useState(null);
@@ -1485,9 +1485,9 @@ const QC = ({ trucks, onUpdate }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 22 }}>🌡️ QC → ตรวจอุณหภูมิ</h2>
+      <h2 style={{ margin: "0 0 6px", fontWeight: 900, fontSize: 22 }}>QC → {actLane.label}</h2>
       <p style={{ margin: "0 0 18px", color: "#6b7280", fontSize: 13 }}>
-        ขั้นตอนที่ 4 · QC ตรวจอุณหภูมิรถเข้าลานโหลด ก่อนโหลดสินค้า
+        ขั้นตอนที่ 4 · QC ตรวจอุณหภูมิรถเข้าลานนี้ ก่อนโหลดสินค้า
       </p>
 
       {flashLane && (
@@ -1496,15 +1496,6 @@ const QC = ({ trucks, onUpdate }) => {
         </div>
       )}
       {eligible.length === 0 && <BlockedBanner msg="รอห้อง Picking พิมพ์เบิกก่อน → รถที่พร้อมจะขึ้นมาที่นี่" />}
-
-      {/* เลือกลานโหลด (dropdown, อยู่บนก่อน) */}
-      <div style={{ background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14 }}>
-        <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>เลือกลานโหลด</label>
-        <select value={lane} onChange={e => { setLane(e.target.value); setTemp(""); setPhoto(null); }}
-          style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}>
-          {LOADING_LANES.map(l => <option key={l.id} value={l.id}>{l.shortLabel}</option>)}
-        </select>
-      </div>
 
       {/* เลือกรถ */}
       <div style={{ background: "#fff", borderRadius: 14, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14 }}>
@@ -1633,7 +1624,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
         const bdr = ld?.done ? l.border : qc?.done ? "#fde047" : "#e5e7eb";
         return (
           <div key={l.id} style={{ flex: 1, background: bg, border: `1px solid ${bdr}`, borderRadius: 8, padding: "5px 4px", textAlign: "center" }}>
-            <div style={{ fontSize: 13 }}>{l.emoji}</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: ld?.done ? l.color : qc?.done ? "#713f12" : "#9ca3af" }}>{l.tinyLabel}</div>
             <div style={{ fontSize: 9, fontWeight: 800, color: ld?.done ? l.color : qc?.done ? "#713f12" : "#9ca3af", lineHeight: 1.3 }}>
               {ld?.done ? `✓ ${ld.doneAt}` : qc?.done ? `QC ${qc.temp}°C` : "–"}
             </div>
@@ -1656,12 +1647,8 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
             <Icon name="check" size={16} /> บันทึกโหลดเสร็จ → {curLane.label}
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <span style={{ fontSize: 32 }}>{curLane.emoji}</span>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 16, color: curLane.color }}>{curLane.label}</div>
-            <div style={{ fontSize: 12, color: "#6b7280" }}>{curLane.label}</div>
-          </div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 900, fontSize: 16, color: curLane.color }}>{curLane.label}</div>
         </div>
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 6 }}>เลือกทะเบียนรถ</label>
         <select value={form.selId} onChange={e => setF(activeLane, { selId: e.target.value })}
@@ -1696,6 +1683,117 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
     </div>
   );
 };
+
+// ── 6.5 LOADING LOG (chat-style feed of completed loads) ─────────────────────
+const cycleDateStr = () => {
+  const d = new Date();
+  if (d.getHours() < 12) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const buildLaneEvents = (list, field) => {
+  const events = [];
+  for (const t of list || []) {
+    for (const lane of LOADING_LANES) {
+      const ld = t[field]?.[lane.id];
+      if (ld?.done && ld?.doneAt) {
+        events.push({
+          key: `${t.id}_${lane.id}`,
+          plate: t.plate,
+          laneLabel: lane.tinyLabel,
+          laneColor: lane.color,
+          laneBg: lane.bg,
+          doneAt: ld.doneAt,
+          photos: ld.photos || [],
+          note: field === "qcLanes" ? (ld.temp != null ? `${ld.temp}°C` : "") : ld.note,
+        });
+      }
+    }
+  }
+  return events.sort((a, b) => b.doneAt.localeCompare(a.doneAt));
+};
+
+const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
+  const today = cycleDateStr();
+  const [date, setDate] = useState(today);
+  const [plateFilter, setPlateFilter] = useState("");
+  const [archiveTrucks, setArchiveTrucks] = useState(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [zoomUrl, setZoomUrl] = useState(null);
+
+  useEffect(() => {
+    if (date === today) { setArchiveTrucks(null); return; }
+    setLoadingArchive(true);
+    supabase.from("wh_archive").select("trucks").eq("archive_date", date).single()
+      .then(({ data }) => setArchiveTrucks(data?.trucks || []))
+      .finally(() => setLoadingArchive(false));
+  }, [date, today]);
+
+  const sourceTrucks = date === today ? trucks : (archiveTrucks || []);
+  const events = buildLaneEvents(sourceTrucks, field).filter(ev =>
+    !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase())
+  );
+  const inp = { border: "1.5px solid #d1d5db", borderRadius: 8, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto" }}>
+      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: 22 }}>{title}</h2>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+        <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: 1, minWidth: 140 }} />
+        {date !== today && (
+          <button onClick={() => setDate(today)} style={{ background: "#111", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            วันนี้
+          </button>
+        )}
+      </div>
+
+      {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
+
+      {!loadingArchive && events.length === 0 && (
+        <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>{emptyMsg}</div>
+      )}
+
+      {!loadingArchive && events.map(ev => (
+        <div key={ev.key} style={{ background: "#fff", borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: `1px solid ${ev.laneBg}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 8, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
+                {ev.laneLabel}
+              </span>
+              <b style={{ fontSize: 15 }}>{ev.plate}</b>
+            </div>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{ev.doneAt}</span>
+          </div>
+          <div style={{ color: "#16a34a", fontWeight: 700, fontSize: 13, marginBottom: ev.photos.length ? 8 : 0 }}>{doneLabel}</div>
+          {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
+          {ev.photos.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
+              {ev.photos.map((url, i) => (
+                <img key={i} src={url} alt="" onClick={() => setZoomUrl(url)}
+                  style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {zoomUrl && (
+        <div onClick={() => setZoomUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out" }}>
+          <img src={zoomUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LoadingLog = ({ trucks }) => (
+  <EventLog trucks={trucks} field="loadLanes" title="💬 Log การโหลดจ่ายสินค้า" emptyMsg="ยังไม่มีรายการโหลดเสร็จ" doneLabel="✅ โหลดเสร็จแล้ว" />
+);
+
+const QCLog = ({ trucks }) => (
+  <EventLog trucks={trucks} field="qcLanes" title="💬 Log การตรวจสอบคุณภาพ" emptyMsg="ยังไม่มีรายการตรวจ QC" doneLabel="🌡️ ตรวจ QC แล้ว" />
+);
 
 // ── 7. PLANNING ───────────────────────────────────────────────────────────────
 const Planning = ({ trucks, queue, onUpdate }) => {
@@ -2097,7 +2195,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
               return (
                 <div key={l.id} style={{ borderRadius: 8, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.emoji} {l.tinyLabel}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.tinyLabel}</div>
                     <button onClick={() => resetQC(l.id)}
                       style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                       ↩ Reset QC
@@ -2128,7 +2226,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
               return (
                 <div key={l.id} style={{ borderRadius: 8, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.emoji} {l.tinyLabel}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: l.color }}>{l.tinyLabel}</div>
                     <button onClick={() => resetLoad(l.id)}
                       style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                       ↩ Reset
@@ -2175,8 +2273,8 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const DETAIL_SOURCES = [
   { id: "wet_market",    label: "ตลาดสด",       emoji: "🛒", color: "#10b981", bg: "#d1fae5" },
-  { id: "modern_trade", label: "Modern Trade",  emoji: "🏪", color: "#3b82f6", bg: "#dbeafe" },
-  { id: "others",       label: "อื่นๆ",          emoji: "📦", color: "#f97316", bg: "#fff7ed" },
+  { id: "modern_trade", label: "Makro",  emoji: "🏪", color: "#3b82f6", bg: "#dbeafe" },
+  { id: "others",       label: "LOTUS",          emoji: "📦", color: "#f97316", bg: "#fff7ed" },
 ];
 
 // Map Thai lane names from Master file → lane IDs used in system
@@ -2511,6 +2609,44 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   );
 };
 
+// ─── ROLE SELECT (landing page: เลือกตำแหน่งงานก่อนเข้าระบบ) ──────────────────
+const ROLE_OPTIONS = [
+  { id: "qc",          label: "QC" },
+  { id: "loading",     label: "ลานโหลด" },
+  { id: "office_wh",   label: "Office คลัง" },
+  { id: "office_plan", label: "Office วางแผน" },
+  { id: "lg",          label: "LG" },
+  { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
+  { id: "all",         label: "ทั้งหมด" },
+];
+
+const ROLE_TABS = {
+  qc:           ["dashboard", "qc_parts", "qc_head", "qc_pork"],
+  loading:      ["dashboard", "loading_parts", "loading_head", "loading_pork"],
+  office_wh:    ["dashboard", "picking"],
+  office_plan:  ["dashboard", "planning", "detail_loading"],
+  lg:           ["dashboard", "lg"],
+  loading_data: ["loading_log", "qc_log"],
+  all:          null,
+};
+
+const RoleSelect = ({ onSelect }) => (
+  <div style={{ minHeight: "100vh", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+    <div style={{ maxWidth: 420, width: "100%" }}>
+      <h2 style={{ textAlign: "center", fontWeight: 900, fontSize: 22, margin: "0 0 6px" }}>เลือกตำแหน่งงาน</h2>
+      <p style={{ textAlign: "center", color: "#6b7280", fontSize: 13, margin: "0 0 20px" }}>ระบบจะแสดงเฉพาะเมนูที่เกี่ยวข้องกับตำแหน่งงานของคุณ</p>
+      <div style={{ display: "grid", gap: 10 }}>
+        {ROLE_OPTIONS.map(r => (
+          <button key={r.id} onClick={() => onSelect(r.id)}
+            style={{ background: "#fff", border: "1.5px solid #e5e7eb", borderRadius: 12, padding: "16px 18px", fontSize: 16, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2536,6 +2672,13 @@ const fetchDetailSrc = async () => {
 export default function App() {
   const isMobile = useIsMobile();
   const isNarrow = useIsNarrow();
+  const defaultTabForRole = (r) => {
+    const allowed = ROLE_TABS[r];
+    return (allowed && !allowed.includes("dashboard")) ? allowed[0] : "dashboard";
+  };
+  const [role,       setRole]       = useState(() => localStorage.getItem("wh_role") || "");
+  const handleSelectRole = (r) => { localStorage.setItem("wh_role", r); setRole(r); setTab(defaultTabForRole(r)); };
+  const handleChangeRole = () => { localStorage.removeItem("wh_role"); setRole(""); setTab("dashboard"); };
   const [queue,      setQueue]      = useState([]);
   const [trucks,     setTrucks]     = useState([]);
   const [masterLane, setMasterLane] = useState(() => {
@@ -2543,7 +2686,7 @@ export default function App() {
   });
   const [detailMap,  setDetailMap]  = useState({}); // plate→Set(lanes) computed
   const [srcVersion, setSrcVersion] = useState(0);  // bumped when source files change
-  const [tab,        setTab]        = useState("dashboard");
+  const [tab,        setTab]        = useState(() => defaultTabForRole(localStorage.getItem("wh_role") || ""));
   const [dashLane,   setDashLane]   = useState("main");
   const [time,       setTime]       = useState(TIME_NOW());
   const [loading,    setLoading]    = useState(true);
@@ -2702,7 +2845,9 @@ export default function App() {
   const badge = {
     driver:        queue.filter(q => !trucks.find(t => t.queueId === q.id)).length,
     picking:       trucks.filter(t => t.status === "arrived").length,
-    qc:            trucks.filter(t => ["arrived","picking"].includes(t.status) && LOADING_LANES.some(l => !t.qcLanes?.[l.id]?.done)).length,
+    qc_parts:      trucks.filter(t => ["arrived","picking"].includes(t.status) && !t.qcLanes?.lane_parts?.done).length,
+    qc_head:       trucks.filter(t => ["arrived","picking"].includes(t.status) && !t.qcLanes?.lane_head?.done).length,
+    qc_pork:       trucks.filter(t => ["arrived","picking"].includes(t.status) && !t.qcLanes?.lane_pork?.done).length,
     loading_parts: trucks.filter(t => t.status === "picking" && t.qcLanes?.lane_parts?.done && !t.loadLanes?.lane_parts?.done).length,
     loading_head:  trucks.filter(t => t.status === "picking" && t.qcLanes?.lane_head?.done  && !t.loadLanes?.lane_head?.done).length,
     loading_pork:  trucks.filter(t => t.status === "picking" && t.qcLanes?.lane_pork?.done  && !t.loadLanes?.lane_pork?.done).length,
@@ -2714,10 +2859,14 @@ export default function App() {
     { id: "lg",        label: "LG",      icon: "upload"    },
     { id: "driver",    label: "คนขับ",   icon: "scan"      },
     { id: "picking",   label: "Picking", icon: "clipboard" },
-    { id: "qc",            label: "QC",       icon: "temp"      },
-    { id: "loading_parts", label: "ชิ้นส่วน", icon: "pig_cuts"  },
-    { id: "loading_head",  label: "หัว/เครื่องใน",  icon: "pig_head"  },
-    { id: "loading_pork",  label: "หมูซีก",  icon: "pig_side"  },
+    { id: "qc_parts",      label: "QC ชิ้นส่วน",        icon: "temp"      },
+    { id: "qc_head",       label: "QC หัว/เครื่องใน",   icon: "temp"      },
+    { id: "qc_pork",       label: "QC หมูซีก",          icon: "temp"      },
+    { id: "loading_parts", label: "ลานโหลดชิ้นส่วน", icon: "pig_cuts"  },
+    { id: "loading_head",  label: "ลานโหลดหัว/เครื่องใน",  icon: "pig_head"  },
+    { id: "loading_pork",  label: "ลานโหลดหมูซีก",  icon: "pig_side"  },
+    { id: "loading_log",   label: "Log การโหลดจ่ายสินค้า", icon: "list" },
+    { id: "qc_log",         label: "Log การตรวจสอบคุณภาพ", icon: "temp" },
     { id: "planning",      label: "Ordering",       icon: "plan"      },
     { id: "detail_loading", label: "Detail Loading", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
@@ -2732,6 +2881,15 @@ export default function App() {
       <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
     </div>
   );
+
+  const isKioskMode = isDriverMode || isQcMode || isLoadingPartsMode || isLoadingHeadMode || isLoadingPorkMode;
+  const allowedTabIds = ROLE_TABS[role] || null;
+  const visibleTabs = allowedTabIds ? tabs.filter(t => allowedTabIds.includes(t.id)) : tabs;
+
+  // ── Role select (เลือกตำแหน่งงานก่อนเข้าระบบ) ──
+  if (!isKioskMode && !role) {
+    return <RoleSelect onSelect={handleSelectRole} />;
+  }
 
   // ── Driver-only mode ──
   if (isDriverMode) {
@@ -2799,12 +2957,17 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
             {isNarrow && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{TODAY} {headerClock}</div>}
           </div>
-          <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
+          <select value={tab} onChange={e => {
+              const v = e.target.value;
+              if (v === "__change_role__") { handleChangeRole(); return; }
+              setTab(v); setDashLane("main");
+            }}
             style={{ flex: "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 0, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? "auto" : 6 }}>
-            {tabs.map(t => {
+            {visibleTabs.map(t => {
               const n = badge[t.id] || 0;
               return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
             })}
+            <option value="__change_role__">(หน้าหลัก)</option>
           </select>
           {!isMobile && tab === "dashboard" && (
             <div style={{ display: "flex", gap: 2 }}>
@@ -2882,10 +3045,14 @@ export default function App() {
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
         {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMap={detailMap} />}
-        {tab === "qc"        && <QC trucks={trucks} onUpdate={handleUpdate} />}
+        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
+        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
+        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
         {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
         {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
         {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
+        {tab === "loading_log"   && <LoadingLog trucks={trucks} />}
+        {tab === "qc_log"        && <QCLog trucks={trucks} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
         {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
