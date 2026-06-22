@@ -2711,18 +2711,18 @@ export default function App() {
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: "chart"     },
-    { id: "lg",        label: "① LG",      icon: "upload"    },
-    { id: "driver",    label: "② คนขับ",   icon: "scan"      },
-    { id: "picking",   label: "③⑥ Picking", icon: "clipboard" },
-    { id: "qc",            label: "④ QC",       icon: "temp"      },
-    { id: "loading_parts", label: "⑤ ชิ้นส่วน", icon: "pig_cuts"  },
-    { id: "loading_head",  label: "⑤ หัว/เครื่องใน",  icon: "pig_head"  },
-    { id: "loading_pork",  label: "⑤ หมูซีก",  icon: "pig_side"  },
-    { id: "planning",      label: "⑦ Ordering",       icon: "plan"      },
-    { id: "detail_loading", label: "⑧ Detail Loading", icon: "clipboard" },
+    { id: "lg",        label: "LG",      icon: "upload"    },
+    { id: "driver",    label: "คนขับ",   icon: "scan"      },
+    { id: "picking",   label: "Picking", icon: "clipboard" },
+    { id: "qc",            label: "QC",       icon: "temp"      },
+    { id: "loading_parts", label: "ชิ้นส่วน", icon: "pig_cuts"  },
+    { id: "loading_head",  label: "หัว/เครื่องใน",  icon: "pig_head"  },
+    { id: "loading_pork",  label: "หมูซีก",  icon: "pig_side"  },
+    { id: "planning",      label: "Ordering",       icon: "plan"      },
+    { id: "detail_loading", label: "Detail Loading", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
-    { id: "admin",          label: "⚙️ Admin",          icon: "plan"      },
-    { id: "qr",             label: "📱 QR คนขับ",       icon: "scan"      },
+    { id: "admin",          label: "Admin",          icon: "plan"      },
+    { id: "qr",             label: "QR คนขับ",       icon: "scan"      },
   ];
 
   // ── Kiosk header helper ──
@@ -2794,14 +2794,13 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
       <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 80, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 22, flexShrink: 0 }}>🏭</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: isMobile ? 1 : "none" }}>
           <div style={{ flexShrink: 0 }}>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
             {isNarrow && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{TODAY} {headerClock}</div>}
           </div>
           <select value={tab} onChange={e => { setTab(e.target.value); setDashLane("main"); }}
-            style={{ flex: isMobile ? 1 : "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 8, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? 0 : 6 }}>
+            style={{ flex: "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 0, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? "auto" : 6 }}>
             {tabs.map(t => {
               const n = badge[t.id] || 0;
               return <option key={t.id} value={t.id}>{t.label}{n > 0 ? ` · ${n}` : ""}</option>;
