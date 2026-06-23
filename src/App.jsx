@@ -370,12 +370,19 @@ const parseExitDatetime = (dateStr, timeStr) => {
   return d;
 };
 
-const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
-  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 15 : 11 }}>—</span>;
+const calcTimeBarInfo = (exitTime, date) => {
   const exitDt = parseExitDatetime(date, exitTime);
   const remaining = exitDt ? Math.round((exitDt - Date.now()) / 60000) : 0;
   const totalWindow = 240;
   const color = remaining > 60 ? "#22c55e" : remaining > 20 ? "#f59e0b" : "#ef4444";
+  const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
+  const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
+  const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
+  return { remaining, color, label, pct };
+};
+
+const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card, hideBar }) => {
+  if (!exitTime) return <span style={{ color: "#d1d5db", fontSize: fs ? 15 : 11 }}>—</span>;
 
   if (done) {
     return (
@@ -386,17 +393,21 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
     );
   }
 
-  const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
-  const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
-  const pct = Math.min(Math.max(remaining / totalWindow, 0), 1) * 100;
+  const { remaining, color, label, pct } = calcTimeBarInfo(exitTime, date);
   const barExtend = card ? null : fs ? { marginLeft: -180, width: "calc(100% + 180px)" } : { marginLeft: -114, width: "calc(100% + 114px)" };
   return (
     <div>
       <div style={{ fontSize: fs ? 16 : card ? 17 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
       <div style={{ fontSize: fs ? 13 : card ? 14 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
-      <div style={{ marginTop: fs ? 14 : 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
+      {!hideBar && <div style={{ marginTop: fs ? 14 : 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />}
     </div>
   );
+};
+
+const TimeBarTrack = ({ exitTime, date, done }) => {
+  if (!exitTime || done) return null;
+  const { color, pct } = calcTimeBarInfo(exitTime, date);
+  return <div style={{ height: 6, borderRadius: 3, background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />;
 };
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -522,13 +533,16 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                       <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
                       <div style={{ fontSize: 13, color: "#6b7280" }}>{customerGroup}</div>
                     </div>
+                    <div style={{ textAlign: "right" }}>
+                      <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card hideBar />
+                    </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
                     <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 12 }}>{entryTime || "—"}</div>
                     {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>({`เข้าจริง ${truck.arrivedAt}`})</div>}
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
+                    <TimeBarTrack exitTime={exitTime} date={date} done={truck?.status === "invoiced"} />
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     {!truck
