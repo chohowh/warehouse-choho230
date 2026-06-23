@@ -518,17 +518,17 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
               return (
                 <div key={key} style={{ background: urgent ? "#fff5f5" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : "1px solid #f3f4f6" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
-                      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{customerGroup}</div>
+                      <div style={{ fontSize: 13, color: "#6b7280" }}>{customerGroup}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 16 }}>{entryTime || "—"}</div>
-                      {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>เข้าจริง {truck.arrivedAt}</div>}
+                      <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
                     </div>
                   </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 16 }}>{entryTime || "—"}</div>
+                    {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>เข้าจริง {truck.arrivedAt}</div>}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     {!truck
