@@ -166,6 +166,124 @@ const QRCodeDisplay = ({ url, size = 220 }) => (
   </div>
 );
 
+const QR_ITEMS = [
+  { mode: "driver",        emoji: "🚛", label: "คนขับ เช็คอิน",     color: "#111",    bg: "#f9fafb" },
+  { mode: "qc_parts",      emoji: "🌡️", label: "QC ชิ้นส่วน",         color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "qc_head",       emoji: "🌡️", label: "QC หัว/เครื่องใน",    color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "qc_pork",       emoji: "🌡️", label: "QC หมูซีก",           color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "loading_parts", emoji: "🥩", label: "Checker ชิ้นส่วน",      color: "#c2410c", bg: "#fff7ed" },
+  { mode: "loading_head",  emoji: "🐷", label: "Checker หัว/เครื่องใน", color: "#7c3aed", bg: "#faf5ff" },
+  { mode: "loading_pork",  emoji: "🐖", label: "Checker หมูซีก",       color: "#be123c", bg: "#fff1f2" },
+  { mode: "sample_parts",  emoji: "📷", label: "ลานโหลด ชิ้นส่วน",      color: "#0d9488", bg: "#f0fdfa" },
+  { mode: "sample_head",   emoji: "📷", label: "ลานโหลด หัว/เครื่องใน", color: "#0d9488", bg: "#f0fdfa" },
+  { mode: "sample_pork",   emoji: "📷", label: "ลานโหลด หมูซีก",       color: "#0d9488", bg: "#f0fdfa" },
+];
+
+const saveQrImage = async (url, mode) => {
+  try {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(url)}`;
+    const blob = await (await fetch(qrUrl)).blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl; a.download = `qr-${mode}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(url)}`, "_blank");
+  }
+};
+
+const QRCodePage = () => {
+  const base = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
+  const [zoomItem, setZoomItem] = useState(null);
+  const driverItems = QR_ITEMS.filter(i => i.mode === "driver");
+  const otherItems  = QR_ITEMS.filter(i => i.mode !== "driver");
+
+  const renderCard = ({ mode, emoji, label, color, bg }) => {
+    const url = `${base}?mode=${mode}`;
+    return (
+      <div key={mode} onClick={() => setZoomItem({ mode, emoji, label, color, bg })}
+        style={{ background: "#fff", borderRadius: 0, padding: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: `2px solid ${color}20`, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer" }}>
+        <div style={{ width: "100%", background: color, borderRadius: 0, padding: "4px 0", textAlign: "center", color: "#fff", fontWeight: 900, fontSize: 10 }}>
+          {emoji} {label}
+        </div>
+        <QRCodeDisplay url={url} size={80} />
+        <div style={{ background: bg, borderRadius: 0, padding: "3px 6px", fontSize: 7, color: "#374151", wordBreak: "break-all", fontFamily: "monospace", width: "100%", boxSizing: "border-box", textAlign: "center" }}>
+          {url}
+        </div>
+        <div style={{ display: "flex", gap: 4, width: "100%" }}>
+          <button onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(url); }}
+            style={{ flex: 1, background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 0", fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
+            📋 คัดลอก
+          </button>
+          <a href={url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+            style={{ flex: 1, background: color, color: "#fff", border: "none", borderRadius: 0, padding: "4px 0", fontSize: 9, fontWeight: 700, cursor: "pointer", textDecoration: "none", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ↗ เปิด
+          </a>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>📱 QR Code ทั้งหมด</h2>
+          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 12 }}>สแกนเพื่อเข้าหน้าต่าง ๆ โดยตรง · คลิกที่กล่องเพื่อดูขนาดใหญ่</p>
+        </div>
+        <button onClick={() => window.print()}
+          style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          🖨️ พิมพ์ทั้งหมด
+        </button>
+      </div>
+      {driverItems.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
+          {driverItems.map(renderCard)}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+        {otherItems.map(renderCard)}
+      </div>
+
+      {zoomItem && (() => {
+        const url = `${base}?mode=${zoomItem.mode}`;
+        return (
+          <div onClick={() => setZoomItem(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 0, padding: 28, maxWidth: 360, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, cursor: "default" }}>
+              <div style={{ width: "100%", background: zoomItem.color, borderRadius: 0, padding: "12px 0", textAlign: "center", color: "#fff", fontWeight: 900, fontSize: 18 }}>
+                {zoomItem.emoji} {zoomItem.label}
+              </div>
+              <QRCodeDisplay url={url} size={280} />
+              <div style={{ background: zoomItem.bg, borderRadius: 0, padding: "8px 12px", fontSize: 11, color: "#374151", wordBreak: "break-all", fontFamily: "monospace", width: "100%", boxSizing: "border-box", textAlign: "center" }}>
+                {url}
+              </div>
+              <div style={{ display: "flex", gap: 8, width: "100%" }}>
+                <button onClick={() => navigator.clipboard?.writeText(url)}
+                  style={{ flex: 1, background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  📋 คัดลอก
+                </button>
+                <a href={url} target="_blank" rel="noreferrer"
+                  style={{ flex: 1, background: zoomItem.color, color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "none", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  ↗ เปิด
+                </a>
+              </div>
+              <button onClick={() => saveQrImage(url, zoomItem.mode)}
+                style={{ width: "100%", background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                💾 บันทึกรูป QR
+              </button>
+              <button onClick={() => setZoomItem(null)}
+                style={{ width: "100%", background: "transparent", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                ปิด
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+
 // ─── ICONS ───────────────────────────────────────────────────────────────────
 const Icon = ({ name, size = 20 }) => {
   const icons = {
@@ -2748,7 +2866,7 @@ const LOADING_TABS = ["dashboard", "loading_parts", "loading_head", "loading_por
 
 const ROLE_TABS = {
   qc:           ["dashboard", "qc_parts", "qc_head", "qc_pork"],
-  loading:      LOADING_TABS,
+  loading:      [...LOADING_TABS, "qr"],
   checker:      ["dashboard", "sample_parts", "sample_head", "sample_pork"],
   office_wh:    ["dashboard", "picking"],
   office_plan:  ["dashboard", "planning", "detail_loading"],
@@ -2835,10 +2953,15 @@ export default function App() {
   // Kiosk modes via URL parameter ?mode=<role>
   const _urlMode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
   const isDriverMode      = _urlMode === "driver";
-  const isQcMode          = _urlMode === "qc";
+  const isQcPartsMode      = _urlMode === "qc_parts";
+  const isQcHeadMode       = _urlMode === "qc_head";
+  const isQcPorkMode       = _urlMode === "qc_pork";
   const isLoadingPartsMode = _urlMode === "loading_parts";
   const isLoadingHeadMode  = _urlMode === "loading_head";
   const isLoadingPorkMode  = _urlMode === "loading_pork";
+  const isSamplePartsMode  = _urlMode === "sample_parts";
+  const isSampleHeadMode   = _urlMode === "sample_head";
+  const isSamplePorkMode   = _urlMode === "sample_pork";
 
   useEffect(() => { const id = setInterval(() => setTime(TIME_NOW()), 15000); return () => clearInterval(id); }, []);
   useEffect(() => { const id = setInterval(() => setHeaderClock(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })), 1000); return () => clearInterval(id); }, []);
@@ -3029,7 +3152,9 @@ export default function App() {
     </div>
   );
 
-  const isKioskMode = isDriverMode || isQcMode || isLoadingPartsMode || isLoadingHeadMode || isLoadingPorkMode;
+  const isKioskMode = isDriverMode || isQcPartsMode || isQcHeadMode || isQcPorkMode
+    || isLoadingPartsMode || isLoadingHeadMode || isLoadingPorkMode
+    || isSamplePartsMode || isSampleHeadMode || isSamplePorkMode;
   const allowedTabIds = ROLE_TABS[role] || null;
   const visibleTabs = allowedTabIds ? tabs.filter(t => allowedTabIds.includes(t.id)) : tabs;
 
@@ -3050,13 +3175,35 @@ export default function App() {
     );
   }
 
-  // ── QC kiosk mode ──
-  if (isQcMode) {
+  // ── QC kiosk modes ──
+  if (isQcPartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="QC ตรวจอุณหภูมิ" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title="QC ชิ้นส่วน" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <QC trucks={trucks} onUpdate={handleUpdate} />
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isQcHeadMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="🌡️" title="QC หัว/เครื่องใน" color="#0369a1" />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isQcPorkMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="🌡️" title="QC หมูซีก" color="#0369a1" />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
         </div>
       </div>
     );
@@ -3091,6 +3238,40 @@ export default function App() {
         <KioskHeader emoji="🐖" title="ลานโหลดหมูซีก" color="#be123c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Random sample temp-check kiosk modes ──
+  if (isSamplePartsMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="📷" title="สุ่มตรวจชิ้นส่วน" color="#0d9488" />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isSampleHeadMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="📷" title="สุ่มตรวจหัว/เครื่องใน" color="#0d9488" />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isSamplePorkMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="📷" title="สุ่มตรวจหมูซีก" color="#0d9488" />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
         </div>
       </div>
     );
@@ -3139,56 +3320,7 @@ export default function App() {
       </div>
       <div style={{ maxWidth: tab === "dashboard" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
-        {tab === "qr"        && (() => {
-          const base = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
-          const qrItems = [
-            { mode: "driver",        emoji: "🚛", label: "คนขับ เช็คอิน",     color: "#111",    bg: "#f9fafb" },
-            { mode: "qc",            emoji: "🌡️", label: "QC ตรวจอุณหภูมิ",  color: "#0369a1", bg: "#f0f9ff" },
-            { mode: "loading_parts", emoji: "🥩", label: "ลานโหลด ชิ้นส่วน",  color: "#c2410c", bg: "#fff7ed" },
-            { mode: "loading_head",  emoji: "🐷", label: "ลานโหลด หัว/เครื่องใน", color: "#7c3aed", bg: "#faf5ff" },
-            { mode: "loading_pork",  emoji: "🐖", label: "ลานโหลด หมูซีก",    color: "#be123c", bg: "#fff1f2" },
-          ];
-          return (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>📱 QR Code ทั้งหมด</h2>
-                  <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>สแกนเพื่อเข้าหน้าต่าง ๆ โดยตรง</p>
-                </div>
-                <button onClick={() => window.print()}
-                  style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  🖨️ พิมพ์ทั้งหมด
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-                {qrItems.map(({ mode, emoji, label, color, bg }) => {
-                  const url = `${base}?mode=${mode}`;
-                  return (
-                    <div key={mode} style={{ background: "#fff", borderRadius: 0, padding: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: `2px solid ${color}20`, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: "100%", background: color, borderRadius: 0, padding: "10px 0", textAlign: "center", color: "#fff", fontWeight: 900, fontSize: 15 }}>
-                        {emoji} {label}
-                      </div>
-                      <QRCodeDisplay url={url} size={200} />
-                      <div style={{ background: bg, borderRadius: 0, padding: "8px 12px", fontSize: 10, color: "#374151", wordBreak: "break-all", fontFamily: "monospace", width: "100%", boxSizing: "border-box", textAlign: "center" }}>
-                        {url}
-                      </div>
-                      <div style={{ display: "flex", gap: 6, width: "100%" }}>
-                        <button onClick={() => navigator.clipboard?.writeText(url)}
-                          style={{ flex: 1, background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                          📋 คัดลอก
-                        </button>
-                        <a href={url} target="_blank" rel="noreferrer"
-                          style={{ flex: 1, background: color, color: "#fff", border: "none", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "none", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          ↗ เปิด
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {tab === "qr"        && <QRCodePage />}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
         {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMap={detailMap} />}
