@@ -1,75 +1,56 @@
 -- ============================================================
 -- Warehouse Phraputthabath — Dev Schema Setup
 -- รันใน Supabase SQL Editor ของ dev project
+--
+-- หมายเหตุ: แอปเก็บข้อมูลทั้งหมดในรูป id + data (jsonb) เพียง 4 ตาราง
+-- ไม่มีตารางแยกคอลัมน์ราย field (trucks/qc_records/loading_records แบบเก่า
+-- ไม่ได้ใช้งานจริงแล้ว ตัดออกจากไฟล์นี้)
+--
+-- รูปสินค้า/อุณหภูมิไม่ได้เก็บใน Supabase Storage — อัปโหลดไป Cloudflare R2
+-- ผ่าน src/lib/r2.js แทน ต้องตั้งค่า VITE_R2_* แยกชุดสำหรับ dev ใน Vercel
+-- (Environment: Preview) ไม่ใช้ตัวเดียวกับ production
 -- ============================================================
 
--- ─── trucks ────────────────────────────────────────────────
-create table if not exists trucks (
-  id           bigserial primary key,
-  "Truck_Plate" text not null,
-  "Truck_Type"  text,
-  "Status"      text default 'waiting',
-  "Que_Date"    date,
-  "Loading_Bay" text,
-  created_at   timestamptz default now()
-);
-
-alter table trucks enable row level security;
-create policy "allow all" on trucks for all using (true) with check (true);
-
--- ─── qc_records ────────────────────────────────────────────
-create table if not exists qc_records (
-  id          bigserial primary key,
-  truck_plate text,
-  temperature numeric,
-  loading_bay text,
-  photo_url   text,
-  created_at  timestamptz default now()
-);
-
-alter table qc_records enable row level security;
-create policy "allow all" on qc_records for all using (true) with check (true);
-
--- ─── loading_records ───────────────────────────────────────
-create table if not exists loading_records (
-  id          bigserial primary key,
-  truck_plate text,
-  loading_bay text,
-  photo_url   text,
-  created_at  timestamptz default now()
-);
-
-alter table loading_records enable row level security;
-create policy "allow all" on loading_records for all using (true) with check (true);
-
 -- ─── wh_queue ──────────────────────────────────────────────
+-- คิวรถจาก LG (ตารางคิวที่ LG อัปโหลด)
 create table if not exists wh_queue (
   id   text primary key,
   data jsonb
 );
 
 alter table wh_queue enable row level security;
+drop policy if exists "allow all" on wh_queue;
 create policy "allow all" on wh_queue for all using (true) with check (true);
 
 -- ─── wh_trucks ─────────────────────────────────────────────
+-- รถแต่ละคัน หนึ่งแถวต่อคัน — data.qcLanes / data.loadLanes / data.sampleLanes
+-- เก็บแยกกันคนละ field ในก้อน JSON เดียวกัน ไม่ชนกัน:
+--   data.qcLanes.<lane_id>     = { done, temp, photos[], doneAt }   — QC ตรวจอุณหภูมิรถ
+--   data.loadLanes.<lane_id>   = { done, waiting, photos[], note, doneAt, waitingAt } — Checker (ลานโหลดจริง)
+--   data.sampleLanes.<lane_id> = { done, photos[], doneAt }         — ลานโหลด: สุ่มตรวจอุณหภูมิสินค้า (ไม่มี temp, แนบรูปอย่างเดียว)
+-- lane_id คือหนึ่งใน: lane_parts | lane_head | lane_pork
 create table if not exists wh_trucks (
   id   text primary key,
   data jsonb
 );
 
 alter table wh_trucks enable row level security;
+drop policy if exists "allow all" on wh_trucks;
 create policy "allow all" on wh_trucks for all using (true) with check (true);
 
 -- ─── wh_master ─────────────────────────────────────────────
+-- ไฟล์ Master ลานโหลด (id = 'master') และไฟล์ Detail Loading รายแหล่ง (id = 'detail_<source_id>')
 create table if not exists wh_master (
   id   text primary key,
   data jsonb
 );
 
 alter table wh_master enable row level security;
+drop policy if exists "allow all" on wh_master;
 create policy "allow all" on wh_master for all using (true) with check (true);
 
 -- ─── wh_archive ────────────────────────────────────────────
+-- สแนปช็อตคิว/รถรายวัน เก็บไว้ดู log ย้อนหลัง (Loading Log / QC Log / Log การตรวจอุณหภูมิสินค้า)
 create table if not exists wh_archive (
   archive_date date primary key,
   queue        jsonb,
@@ -77,22 +58,5 @@ create table if not exists wh_archive (
 );
 
 alter table wh_archive enable row level security;
+drop policy if exists "allow all" on wh_archive;
 create policy "allow all" on wh_archive for all using (true) with check (true);
-
--- ============================================================
--- Storage buckets (รันใน SQL Editor ได้เลย)
--- ============================================================
-insert into storage.buckets (id, name, public)
-values ('qc-photos', 'qc-photos', true)
-on conflict (id) do nothing;
-
-insert into storage.buckets (id, name, public)
-values ('loading-photos', 'loading-photos', true)
-on conflict (id) do nothing;
-
--- Storage policies
-create policy "allow all qc-photos" on storage.objects
-  for all using (bucket_id = 'qc-photos') with check (bucket_id = 'qc-photos');
-
-create policy "allow all loading-photos" on storage.objects
-  for all using (bucket_id = 'loading-photos') with check (bucket_id = 'loading-photos');
