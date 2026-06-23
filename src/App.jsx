@@ -380,8 +380,8 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   if (done) {
     return (
       <div>
-        <div style={{ fontSize: fs ? 15 : 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
-        {invoicedAt && <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
+        <div style={{ fontSize: fs ? 15 : card ? 17 : 11, fontWeight: 700, color: "#374151" }}>{exitTime}</div>
+        {invoicedAt && <div style={{ fontSize: fs ? 13 : card ? 13 : 10, color: "#6b7280", marginTop: 2 }}>ออกจริง {invoicedAt}</div>}
       </div>
     );
   }
@@ -392,8 +392,8 @@ const TimeBar = ({ exitTime, date, done, invoicedAt, fs, card }) => {
   const barExtend = card ? null : fs ? { marginLeft: -180, width: "calc(100% + 180px)" } : { marginLeft: -114, width: "calc(100% + 114px)" };
   return (
     <div>
-      <div style={{ fontSize: fs ? 16 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
-      <div style={{ fontSize: fs ? 13 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
+      <div style={{ fontSize: fs ? 16 : card ? 17 : 13, fontWeight: 700, color: remaining <= 0 ? "#ef4444" : "#374151", whiteSpace: "nowrap", lineHeight: "18px" }}>{exitTime}</div>
+      <div style={{ fontSize: fs ? 13 : card ? 14 : 11, color, marginTop: 2, whiteSpace: "nowrap", fontWeight: 600, lineHeight: "16px" }}>{label}</div>
       <div style={{ marginTop: fs ? 14 : 4, height: fs ? 10 : 6, borderRadius: card ? 3 : 0, ...(barExtend ?? {}), background: `linear-gradient(to right, ${color} ${pct}%, #e5e7eb ${pct}%)` }} />
     </div>
   );
@@ -522,13 +522,13 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                       <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
                       <div style={{ fontSize: 13, color: "#6b7280" }}>{customerGroup}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
-                    </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-                    <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 16 }}>{entryTime || "—"}</div>
-                    {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>เข้าจริง {truck.arrivedAt}</div>}
+                    <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 12 }}>{entryTime || "—"}</div>
+                    {truck?.arrivedAt && <div style={{ fontSize: 11, color: "#9ca3af" }}>({`เข้าจริง ${truck.arrivedAt}`})</div>}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card />
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     {!truck
