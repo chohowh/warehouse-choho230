@@ -1778,6 +1778,19 @@ const cycleDateStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// doneAt is just "HH:mm"; events before the noon cutoff belong to the work-day's
+// *next* calendar date (truck loaded after midnight, e.g. 00:14, still files under
+// the previous work-day) — show that real date next to the time so it's not confusing.
+const formatLogTime = (doneAt, workDate) => {
+  const hour = parseInt(doneAt.split(":")[0], 10);
+  if (hour >= 12) return doneAt;
+  const [y, m, d] = workDate.split("-").map(Number);
+  const realDate = new Date(y, m - 1, d + 1);
+  const dd = String(realDate.getDate()).padStart(2, "0");
+  const mm = String(realDate.getMonth() + 1).padStart(2, "0");
+  return `${doneAt} (${dd}/${mm})`;
+};
+
 const buildLaneEvents = (list, field) => {
   const events = [];
   for (const t of list || []) {
@@ -1851,7 +1864,7 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
               </span>
               <b style={{ fontSize: 15 }}>{ev.plate}</b>
             </div>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>{ev.doneAt}</span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
           </div>
           <div style={{ color: "#16a34a", fontWeight: 700, fontSize: 13, marginBottom: ev.photos.length ? 8 : 0 }}>{doneLabel}</div>
           {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
