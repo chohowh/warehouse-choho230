@@ -1936,7 +1936,10 @@ const buildLaneEvents = (list, field) => {
       if (ld?.done && ld?.doneAt) {
         events.push({
           key: `${t.id}_${lane.id}`,
+          truckId: t.id,
           plate: t.plate,
+          customerGroup: t.customerGroup || "",
+          zone: t.zone || "",
           laneLabel: lane.tinyLabel,
           laneColor: lane.color,
           laneBg: lane.bg,
@@ -1955,6 +1958,8 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
   const today = cycleDateStr();
   const [date, setDate] = useState(today);
   const [plateFilter, setPlateFilter] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
   const [archiveTrucks, setArchiveTrucks] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [zoomUrl, setZoomUrl] = useState(null);
@@ -1968,9 +1973,27 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
   }, [date, today]);
 
   const sourceTrucks = date === today ? trucks : (archiveTrucks || []);
-  const events = buildLaneEvents(sourceTrucks, field).filter(ev =>
-    !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase())
-  );
+  const events = buildLaneEvents(sourceTrucks, field).filter(ev => {
+    const matchesPlate = !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase());
+    const matchesZone = !zoneFilter.trim() || ev.zone?.toLowerCase().includes(zoneFilter.trim().toLowerCase());
+    const matchesGroup = !groupFilter.trim() || ev.customerGroup?.toLowerCase().includes(groupFilter.trim().toLowerCase());
+    return matchesPlate && matchesZone && matchesGroup;
+  });
+
+  const groupsByTruck = [];
+  const groupIndex = new Map();
+  for (const ev of events) {
+    let group = groupIndex.get(ev.truckId);
+    if (!group) {
+      group = { truckId: ev.truckId, plate: ev.plate, customerGroup: ev.customerGroup, zone: ev.zone, doneAt: ev.doneAt, lanes: [] };
+      groupIndex.set(ev.truckId, group);
+      groupsByTruck.push(group);
+    }
+    group.lanes.push(ev);
+    if (ev.doneAt > group.doneAt) group.doneAt = ev.doneAt;
+  }
+  groupsByTruck.sort((a, b) => b.doneAt.localeCompare(a.doneAt));
+
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
   return (
@@ -1979,6 +2002,8 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
         <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
+        <input type="text" placeholder="ค้นหา Zone" value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 120 }} />
+        <input type="text" placeholder="ค้นหากลุ่มลูกค้า" value={groupFilter} onChange={e => setGroupFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
         {date !== today && (
           <button onClick={() => setDate(today)} style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", width: isMobile ? "100%" : undefined }}>
             วันนี้
@@ -1988,31 +2013,43 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
 
-      {!loadingArchive && events.length === 0 && (
+      {!loadingArchive && groupsByTruck.length === 0 && (
         <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>{emptyMsg}</div>
       )}
 
-      {!loadingArchive && events.map(ev => (
-        <div key={ev.key} style={{ background: "#fff", borderRadius: 0, padding: isMobile ? 12 : 14, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: `1px solid ${ev.laneBg}` }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
-                {ev.laneLabel}
-              </span>
-              <b style={{ fontSize: 15 }}>{ev.plate}</b>
-            </div>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
+      {!loadingArchive && groupsByTruck.map(group => (
+        <div key={group.truckId} style={{ background: "#fff", borderRadius: 0, padding: isMobile ? 12 : 14, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
+            <b style={{ fontSize: 15 }}>{group.plate}</b>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(group.doneAt, date)}</span>
           </div>
-          <div style={{ color: "#16a34a", fontWeight: 700, fontSize: 13, marginBottom: ev.photos.length ? 8 : 0 }}>{doneLabel}</div>
-          {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
-          {ev.photos.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 64 : 80}px, 1fr))`, gap: 6 }}>
-              {ev.photos.map((url, i) => (
-                <img key={i} src={url} alt="" onClick={() => setZoomUrl(url)}
-                  style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 0, cursor: "pointer" }} />
-              ))}
+          {(group.customerGroup || group.zone) && (
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
+              {group.customerGroup && <span>กลุ่มลูกค้า: {group.customerGroup}</span>}
+              {group.customerGroup && group.zone && <span> · </span>}
+              {group.zone && <span>Zone: {group.zone}</span>}
             </div>
           )}
+          {group.lanes.map((ev, i) => (
+            <div key={ev.key} style={{ borderTop: i === 0 ? "none" : "1px dashed #e5e7eb", paddingTop: i === 0 ? 0 : 10, marginTop: i === 0 ? 0 : 10 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
+                  {ev.laneLabel}
+                </span>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
+              </div>
+              <div style={{ color: "#16a34a", fontWeight: 700, fontSize: 13, marginBottom: ev.photos.length ? 8 : 0 }}>{doneLabel}</div>
+              {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
+              {ev.photos.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 64 : 80}px, 1fr))`, gap: 6 }}>
+                  {ev.photos.map((url, idx) => (
+                    <img key={idx} src={url} alt="" onClick={() => setZoomUrl(url)}
+                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 0, cursor: "pointer" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       ))}
 
@@ -2866,7 +2903,7 @@ const LOADING_TABS = ["dashboard", "loading_parts", "loading_head", "loading_por
 
 const ROLE_TABS = {
   qc:           ["dashboard", "qc_parts", "qc_head", "qc_pork"],
-  loading:      [...LOADING_TABS, "qr"],
+  loading:      LOADING_TABS,
   checker:      ["dashboard", "sample_parts", "sample_head", "sample_pork"],
   office_wh:    ["dashboard", "picking"],
   office_plan:  ["dashboard", "planning", "detail_loading"],
@@ -3179,7 +3216,7 @@ export default function App() {
   if (isQcPartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="QC ชิ้นส่วน" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title="ลานโหลด ชิ้นส่วน" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
         </div>
@@ -3190,7 +3227,7 @@ export default function App() {
   if (isQcHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="QC หัว/เครื่องใน" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title="ลานโหลด หัว/เครื่องใน" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
         </div>
@@ -3201,7 +3238,7 @@ export default function App() {
   if (isQcPorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="QC หมูซีก" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title="ลานโหลด หมูซีก" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
         </div>
@@ -3247,7 +3284,7 @@ export default function App() {
   if (isSamplePartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="สุ่มตรวจชิ้นส่วน" color="#0d9488" />
+        <KioskHeader emoji="📷" title="QC ชิ้นส่วน" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
         </div>
@@ -3258,7 +3295,7 @@ export default function App() {
   if (isSampleHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="สุ่มตรวจหัว/เครื่องใน" color="#0d9488" />
+        <KioskHeader emoji="📷" title="QC หัว/เครื่องใน" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
         </div>
@@ -3269,7 +3306,7 @@ export default function App() {
   if (isSamplePorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="สุ่มตรวจหมูซีก" color="#0d9488" />
+        <KioskHeader emoji="📷" title="QC หมูซีก" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
         </div>
