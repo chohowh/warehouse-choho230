@@ -168,15 +168,15 @@ const QRCodeDisplay = ({ url, size = 220 }) => (
 
 const QR_ITEMS = [
   { mode: "driver",        emoji: "🚛", label: "คนขับ เช็คอิน",     color: "#111",    bg: "#f9fafb" },
-  { mode: "qc_parts",      emoji: "🌡️", label: "QC ชิ้นส่วน",         color: "#0369a1", bg: "#f0f9ff" },
-  { mode: "qc_head",       emoji: "🌡️", label: "QC หัว/เครื่องใน",    color: "#0369a1", bg: "#f0f9ff" },
-  { mode: "qc_pork",       emoji: "🌡️", label: "QC หมูซีก",           color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "qc_parts",      emoji: "🌡️", label: "ลานโหลด ชิ้นส่วน",      color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "qc_head",       emoji: "🌡️", label: "ลานโหลด หัว/เครื่องใน", color: "#0369a1", bg: "#f0f9ff" },
+  { mode: "qc_pork",       emoji: "🌡️", label: "ลานโหลด หมูซีก",       color: "#0369a1", bg: "#f0f9ff" },
   { mode: "loading_parts", emoji: "🥩", label: "Checker ชิ้นส่วน",      color: "#c2410c", bg: "#fff7ed" },
   { mode: "loading_head",  emoji: "🐷", label: "Checker หัว/เครื่องใน", color: "#7c3aed", bg: "#faf5ff" },
   { mode: "loading_pork",  emoji: "🐖", label: "Checker หมูซีก",       color: "#be123c", bg: "#fff1f2" },
-  { mode: "sample_parts",  emoji: "📷", label: "ลานโหลด ชิ้นส่วน",      color: "#0d9488", bg: "#f0fdfa" },
-  { mode: "sample_head",   emoji: "📷", label: "ลานโหลด หัว/เครื่องใน", color: "#0d9488", bg: "#f0fdfa" },
-  { mode: "sample_pork",   emoji: "📷", label: "ลานโหลด หมูซีก",       color: "#0d9488", bg: "#f0fdfa" },
+  { mode: "sample_parts",  emoji: "📷", label: "QC ชิ้นส่วน",          color: "#0d9488", bg: "#f0fdfa" },
+  { mode: "sample_head",   emoji: "📷", label: "QC หัว/เครื่องใน",     color: "#0d9488", bg: "#f0fdfa" },
+  { mode: "sample_pork",   emoji: "📷", label: "QC หมูซีก",           color: "#0d9488", bg: "#f0fdfa" },
 ];
 
 const saveQrImage = async (url, mode) => {
