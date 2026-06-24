@@ -2924,6 +2924,7 @@ const ROLE_OPTIONS = [
   { id: "office_wh",   label: "Office คลัง",    emoji: "🖨️" },
   { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
   { id: "lg",          label: "LG",            emoji: "⬆️" },
+  { id: "dashboard_only", label: "Dashboard" },
   { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
   { id: "all",         label: "ทั้งหมด" },
 ];
@@ -2937,6 +2938,7 @@ const ROLE_TABS = {
   office_wh:    ["dashboard", "picking"],
   office_plan:  ["dashboard", "planning", "detail_loading"],
   lg:           ["dashboard", "lg"],
+  dashboard_only: ["dashboard"],
   loading_data: ["loading_log", "qc_log", "sample_log"],
   all:          null,
 };
