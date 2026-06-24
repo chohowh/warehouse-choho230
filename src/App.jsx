@@ -437,7 +437,7 @@ const PhotoUploader = ({ label, value, onChange, onRemove }) => {
                     )}
                   </div>
                 ))}
-                {photos.length < 7 && (
+                {photos.length < 15 && (
                   <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", aspectRatio: "1", borderRadius: 0, border: "1.5px dashed #d1d5db", cursor: "pointer", background: "#fff", gap: 2 }}>
                     <input type="file" accept="image/*" multiple onChange={onChange} style={{ display: "none" }} />
                     <Icon name="camera" size={18} />
@@ -446,14 +446,14 @@ const PhotoUploader = ({ label, value, onChange, onRemove }) => {
                 )}
               </div>
               <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "#10b981", fontWeight: 700 }}>
-                {photos.length} / 7 รูป
+                {photos.length} / 15 รูป
               </div>
             </div>
           : <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="file" accept="image/*" multiple onChange={onChange} style={{ display: "none" }} />
               <Icon name="camera" size={28} />
               <span style={{ color: "#9ca3af", fontSize: 13 }}>ถ่ายรูป / เลือกจาก Gallery</span>
-              <span style={{ color: "#d1d5db", fontSize: 11 }}>สูงสุด 7 รูปต่อครั้ง</span>
+              <span style={{ color: "#d1d5db", fontSize: 11 }}>สูงสุด 15 รูปต่อครั้ง</span>
             </label>
         }
       </div>
@@ -1603,11 +1603,11 @@ const QC = ({ trucks, onUpdate, laneId }) => {
   const thisLaneQCd = sel?.qcLanes?.[lane]?.done;
 
   const handlePhoto = e => {
-    const files = Array.from(e.target.files).slice(0, 7); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setPhoto(prev => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
-        return [...p, ...newPhotos].slice(0, 7);
+        return [...p, ...newPhotos].slice(0, 15);
       });
     });
   };
@@ -1644,7 +1644,7 @@ const QC = ({ trucks, onUpdate, laneId }) => {
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>เลือกทะเบียนรถ</label>
         <select value={selId} onChange={e => { setSelId(e.target.value); setTemp(""); setPhoto(null); }}
           style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}>
-          <option value="">-- เลือกทะเบียนรถที่รอ QC --</option>
+          <option value="">-- เลือกทะเบียนรถที่รอเข้าโหลด --</option>
           {eligible.map(t => <option key={t.id} value={t.id}>{t.loadLanes?.[lane]?.waiting ? "⏳ " : ""}{t.plate} · {t.customerGroup || t.product}</option>)}
         </select>
         {sel && (
@@ -1701,6 +1701,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
   const [selId,     setSelId]     = useState("");
   const lane = laneId;
   const [photo,     setPhoto]     = useState(null);
+  const [note,      setNote]      = useState("");
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
 
@@ -1711,11 +1712,11 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
   const thisLaneChecked = sel?.sampleLanes?.[lane]?.done;
 
   const handlePhoto = e => {
-    const files = Array.from(e.target.files).slice(0, 7); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setPhoto(prev => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
-        return [...p, ...newPhotos].slice(0, 7);
+        return [...p, ...newPhotos].slice(0, 15);
       });
     });
   };
@@ -1725,9 +1726,9 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
     setUploading(true);
     try {
       const photoUrls = await uploadPhotos(`sample`, sel.plate, photos);
-      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, doneAt: TIME_NOW() } };
+      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW() } };
       onUpdate(sel.id, { sampleLanes });
-      setFlashLane(lane); setPhoto(null);
+      setFlashLane(lane); setPhoto(null); setNote("");
       setTimeout(() => setFlashLane(null), 2500);
     } catch (e) {
       alert("อัพโหลดรูปไม่สำเร็จ: " + e.message);
@@ -1748,7 +1749,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
       {/* เลือกรถ */}
       <div style={{ background: "#fff", borderRadius: 0, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>เลือกทะเบียนรถ</label>
-        <select value={selId} onChange={e => { setSelId(e.target.value); setPhoto(null); }}
+        <select value={selId} onChange={e => { setSelId(e.target.value); setPhoto(null); setNote(""); }}
           style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}>
           <option value="">-- เลือกทะเบียนรถ --</option>
           {eligible.map(t => <option key={t.id} value={t.id}>{t.plate} · {t.customerGroup || t.product}</option>)}
@@ -1787,6 +1788,13 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
           <div style={{ fontWeight: 800, fontSize: 15, color: actLane.color }}>{actLane.label}</div>
           <div style={{ fontSize: 12, color: "#6b7280" }}>ตรวจอุณหภูมิสินค้าก่อนโหลดขึ้นรถ — ถ่ายรูปยืนยัน</div>
         </div>
+        <textarea
+          placeholder="Note (ถ้ามี)"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          rows={2}
+          style={{ width: "100%", border: `1.5px solid ${actLane.border}`, borderRadius: 0, padding: "10px 12px", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
+        />
         <PhotoUploader label="📷 ถ่ายรูปอุณหภูมิ" value={photo} onChange={handlePhoto} onRemove={setPhoto} />
       </div>
 
@@ -1822,12 +1830,12 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
   const sel = trucks.find(t => t.id === form.selId) || null;
 
   const handlePhoto = lId => e => {
-    const files = Array.from(e.target.files).slice(0, 7); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setForms(prev => {
         const f = prev[lId];
         const curPhotos = Array.isArray(f.photo) ? f.photo : (f.photo ? [f.photo] : []);
-        return { ...prev, [lId]: { ...f, photo: [...curPhotos, ...newPhotos].slice(0, 7) } };
+        return { ...prev, [lId]: { ...f, photo: [...curPhotos, ...newPhotos].slice(0, 15) } };
       });
     });
   };
@@ -1956,38 +1964,40 @@ const workTimeValue = (doneAt) => {
   return (h < 12 ? h + 24 : h) * 60 + m;
 };
 
-const buildLaneEvents = (list, field) => {
+const buildLaneEvents = (list, sources) => {
   const events = [];
   for (const t of list || []) {
-    for (const lane of LOADING_LANES) {
-      const ld = t[field]?.[lane.id];
-      if (ld?.done && ld?.doneAt) {
-        events.push({
-          key: `${t.id}_${lane.id}`,
-          truckId: t.id,
-          plate: t.plate,
-          customerGroup: t.customerGroup || "",
-          zone: t.zone || "",
-          laneLabel: lane.tinyLabel,
-          laneColor: lane.color,
-          laneBg: lane.bg,
-          doneAt: ld.doneAt,
-          photos: ld.photos || [],
-          note: field === "qcLanes" ? (ld.temp != null ? `${ld.temp}°C` : "") : ld.note,
-        });
+    for (const src of sources) {
+      for (const lane of LOADING_LANES) {
+        const ld = t[src.field]?.[lane.id];
+        if (ld?.done && ld?.doneAt) {
+          events.push({
+            key: `${t.id}_${src.field}_${lane.id}`,
+            truckId: t.id,
+            plate: t.plate,
+            customerGroup: t.customerGroup || "",
+            zone: t.zone || "",
+            laneLabel: lane.tinyLabel,
+            laneColor: lane.color,
+            laneBg: lane.bg,
+            doneAt: ld.doneAt,
+            photos: ld.photos || [],
+            doneLabel: src.doneLabel,
+            note: src.field === "qcLanes" ? (ld.temp != null ? `${ld.temp}°C` : "") : ld.note,
+          });
+        }
       }
     }
   }
   return events.sort((a, b) => workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
 };
 
-const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
+const EventLog = ({ trucks, sources, title, emptyMsg }) => {
   const isMobile = useIsMobile();
   const today = cycleDateStr();
   const [date, setDate] = useState(today);
   const [plateFilter, setPlateFilter] = useState("");
-  const [zoneFilter, setZoneFilter] = useState("");
-  const [groupFilter, setGroupFilter] = useState("");
+  const [extraFilter, setExtraFilter] = useState("");
   const [archiveTrucks, setArchiveTrucks] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [zoomUrl, setZoomUrl] = useState(null);
@@ -2001,26 +2011,47 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
   }, [date, today]);
 
   const sourceTrucks = date === today ? trucks : (archiveTrucks || []);
-  const events = buildLaneEvents(sourceTrucks, field).filter(ev => {
+  const events = buildLaneEvents(sourceTrucks, sources).filter(ev => {
     const matchesPlate = !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase());
-    const matchesZone = !zoneFilter.trim() || ev.zone?.toLowerCase().includes(zoneFilter.trim().toLowerCase());
-    const matchesGroup = !groupFilter.trim() || ev.customerGroup?.toLowerCase().includes(groupFilter.trim().toLowerCase());
-    return matchesPlate && matchesZone && matchesGroup;
+    const extraQuery = extraFilter.trim().toLowerCase();
+    const matchesExtra = !extraQuery
+      || ev.zone?.toLowerCase().includes(extraQuery)
+      || ev.customerGroup?.toLowerCase().includes(extraQuery)
+      || ev.note?.toLowerCase().includes(extraQuery);
+    return matchesPlate && matchesExtra;
   });
+
+  const truckById = new Map((sourceTrucks || []).map(t => [t.id, t]));
+  const latestLoadDoneAt = truckId => {
+    const t = truckById.get(truckId);
+    let latest = null;
+    for (const lane of LOADING_LANES) {
+      const ld = t?.loadLanes?.[lane.id];
+      if (ld?.done && ld?.doneAt && (latest == null || workTimeValue(ld.doneAt) > workTimeValue(latest))) latest = ld.doneAt;
+    }
+    return latest;
+  };
 
   const groupsByTruck = [];
   const groupIndex = new Map();
   for (const ev of events) {
     let group = groupIndex.get(ev.truckId);
     if (!group) {
-      group = { truckId: ev.truckId, plate: ev.plate, customerGroup: ev.customerGroup, zone: ev.zone, doneAt: ev.doneAt, lanes: [] };
+      group = { truckId: ev.truckId, plate: ev.plate, customerGroup: ev.customerGroup, zone: ev.zone, doneAt: ev.doneAt, loadDoneAt: latestLoadDoneAt(ev.truckId), lanes: [] };
       groupIndex.set(ev.truckId, group);
       groupsByTruck.push(group);
     }
     group.lanes.push(ev);
     if (workTimeValue(ev.doneAt) > workTimeValue(group.doneAt)) group.doneAt = ev.doneAt;
   }
-  groupsByTruck.sort((a, b) => workTimeValue(b.doneAt) - workTimeValue(a.doneAt));
+  // trucks with a "โหลดเสร็จ" action (any lane) always rank above trucks without one,
+  // sorted by recency within each bucket
+  groupsByTruck.sort((a, b) => {
+    if (!!a.loadDoneAt !== !!b.loadDoneAt) return a.loadDoneAt ? -1 : 1;
+    const aTime = a.loadDoneAt ? workTimeValue(a.loadDoneAt) : workTimeValue(a.doneAt);
+    const bTime = b.loadDoneAt ? workTimeValue(b.loadDoneAt) : workTimeValue(b.doneAt);
+    return bTime - aTime;
+  });
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
@@ -2030,8 +2061,7 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
         <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
-        <input type="text" placeholder="ค้นหา Zone" value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 120 }} />
-        <input type="text" placeholder="ค้นหากลุ่มลูกค้า" value={groupFilter} onChange={e => setGroupFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
+        <input type="text" placeholder="ค้นหา Zone / กลุ่มลูกค้า / Note" value={extraFilter} onChange={e => setExtraFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }} />
       </div>
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
@@ -2059,7 +2089,7 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
                   <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
                     {ev.laneLabel}
                   </span>
-                  <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>{doneLabel}</span>
+                  <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>{ev.doneLabel}</span>
                 </div>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
               </div>
@@ -2090,16 +2120,26 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
   );
 };
 
+const LOG_SOURCES = {
+  loadLanes:   { field: "loadLanes",   doneLabel: "✅ โหลดเสร็จแล้ว" },
+  qcLanes:     { field: "qcLanes",     doneLabel: "🌡️ ตรวจสอบอุณหภูมิแล้ว" },
+  sampleLanes: { field: "sampleLanes", doneLabel: "📷 ตรวจแล้ว" },
+};
+
 const LoadingLog = ({ trucks }) => (
-  <EventLog trucks={trucks} field="loadLanes" title="💬 Log การโหลดจ่ายสินค้า" emptyMsg="ยังไม่มีรายการโหลดเสร็จ" doneLabel="✅ โหลดเสร็จแล้ว" />
+  <EventLog trucks={trucks} sources={[LOG_SOURCES.loadLanes]} title="💬 Log การโหลดจ่ายสินค้า" emptyMsg="ยังไม่มีรายการโหลดเสร็จ" />
 );
 
 const QCLog = ({ trucks }) => (
-  <EventLog trucks={trucks} field="qcLanes" title="💬 Log การตรวจอุณหภูมิรถขนส่ง" emptyMsg="ยังไม่มีรายการตรวจ QC" doneLabel="🌡️ ตรวจ QC แล้ว" />
+  <EventLog trucks={trucks} sources={[LOG_SOURCES.qcLanes]} title="💬 Log การตรวจอุณหภูมิรถขนส่ง" emptyMsg="ยังไม่มีรายการตรวจ QC" />
 );
 
 const SampleLog = ({ trucks }) => (
-  <EventLog trucks={trucks} field="sampleLanes" title="💬 Log การตรวจอุณหภูมิสินค้า" emptyMsg="ยังไม่มีรายการตรวจอุณหภูมิ" doneLabel="📷 ตรวจแล้ว" />
+  <EventLog trucks={trucks} sources={[LOG_SOURCES.sampleLanes]} title="💬 Log การตรวจอุณหภูมิสินค้า" emptyMsg="ยังไม่มีรายการตรวจอุณหภูมิ" />
+);
+
+const OverviewLog = ({ trucks }) => (
+  <EventLog trucks={trucks} sources={[LOG_SOURCES.loadLanes, LOG_SOURCES.qcLanes, LOG_SOURCES.sampleLanes]} title="💬 Log ภาพรวมการทำงาน" emptyMsg="ยังไม่มีรายการทำงาน" />
 );
 
 // ── 7. PLANNING ───────────────────────────────────────────────────────────────
@@ -2938,7 +2978,7 @@ const ROLE_TABS = {
   office_plan:  ["dashboard", "planning", "detail_loading"],
   lg:           ["dashboard", "lg"],
   dashboard_only: ["dashboard"],
-  loading_data: ["loading_log", "qc_log", "sample_log"],
+  loading_data: ["overview_log", "loading_log", "qc_log", "sample_log"],
   all:          null,
 };
 
@@ -3201,6 +3241,7 @@ export default function App() {
     { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
+    { id: "overview_log",  label: "Log ภาพรวมการทำงาน", icon: "list" },
     { id: "loading_log",   label: "Log การโหลดจ่ายสินค้า", icon: "list" },
     { id: "qc_log",         label: "Log การตรวจอุณหภูมิรถขนส่ง", icon: "temp" },
     { id: "sample_log",     label: "Log การตรวจอุณหภูมิสินค้า", icon: "camera" },
@@ -3400,6 +3441,7 @@ export default function App() {
         {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
         {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
         {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
+        {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
         {tab === "loading_log"   && <LoadingLog trucks={trucks} />}
         {tab === "qc_log"        && <QCLog trucks={trucks} />}
         {tab === "sample_log"    && <SampleLog trucks={trucks} />}
