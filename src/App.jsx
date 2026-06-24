@@ -179,6 +179,26 @@ const QR_ITEMS = [
   { mode: "sample_pork",   emoji: "📷", label: "QC หมูซีก",           color: "#0d9488", bg: "#f0fdfa" },
 ];
 
+const saveImageToDevice = async (url, fileName) => {
+  let blob;
+  try {
+    blob = await (await fetch(url)).blob();
+  } catch {
+    window.open(url, "_blank");
+    return;
+  }
+  const file = new File([blob], fileName, { type: blob.type || "image/jpeg" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); } catch { /* user cancelled share sheet */ }
+    return;
+  }
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl; a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(blobUrl);
+};
+
 const saveQrImage = async (url, mode) => {
   try {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(url)}`;
@@ -2059,8 +2079,12 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
       ))}
 
       {zoomUrl && (
-        <div onClick={() => setZoomUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out" }}>
-          <img src={zoomUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 0 }} />
+        <div onClick={() => setZoomUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: 20, cursor: "zoom-out" }}>
+          <img src={zoomUrl} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "75vh", borderRadius: 0, cursor: "default" }} />
+          <button onClick={e => { e.stopPropagation(); saveImageToDevice(zoomUrl, `photo-${Date.now()}.jpg`); }}
+            style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            💾 บันทึกรูปลงเครื่อง
+          </button>
         </div>
       )}
     </div>
