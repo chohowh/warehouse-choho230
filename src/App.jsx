@@ -2020,7 +2020,7 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
     group.lanes.push(ev);
     if (workTimeValue(ev.doneAt) > workTimeValue(group.doneAt)) group.doneAt = ev.doneAt;
   }
-  groupsByTruck.sort((a, b) => workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
+  groupsByTruck.sort((a, b) => workTimeValue(b.doneAt) - workTimeValue(a.doneAt));
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
@@ -2044,7 +2044,6 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
         <div key={group.truckId} style={{ background: "#fff", borderRadius: 0, padding: isMobile ? 12 : 14, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
             <b style={{ fontSize: 15 }}>{group.plate}</b>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(group.doneAt, date)}</span>
           </div>
           {(group.customerGroup || group.zone) && (
             <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
