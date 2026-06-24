@@ -1928,6 +1928,14 @@ const formatLogTime = (doneAt, workDate) => {
   return `${doneAt} (${dd}/${mm})`;
 };
 
+// converts "HH:mm" into a sortable minute value that respects the noon work-day
+// cutoff: times before noon belong to the *next* calendar day, so they must sort
+// after evening times of the same work-day (e.g. 18:00 < 00:14 next day).
+const workTimeValue = (doneAt) => {
+  const [h, m] = doneAt.split(":").map(Number);
+  return (h < 12 ? h + 24 : h) * 60 + m;
+};
+
 const buildLaneEvents = (list, field) => {
   const events = [];
   for (const t of list || []) {
@@ -1950,7 +1958,7 @@ const buildLaneEvents = (list, field) => {
       }
     }
   }
-  return events.sort((a, b) => b.doneAt.localeCompare(a.doneAt));
+  return events.sort((a, b) => workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
 };
 
 const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
@@ -1990,9 +1998,9 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
       groupsByTruck.push(group);
     }
     group.lanes.push(ev);
-    if (ev.doneAt > group.doneAt) group.doneAt = ev.doneAt;
+    if (workTimeValue(ev.doneAt) > workTimeValue(group.doneAt)) group.doneAt = ev.doneAt;
   }
-  groupsByTruck.sort((a, b) => b.doneAt.localeCompare(a.doneAt));
+  groupsByTruck.sort((a, b) => workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
@@ -2004,11 +2012,6 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
         <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
         <input type="text" placeholder="ค้นหา Zone" value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 120 }} />
         <input type="text" placeholder="ค้นหากลุ่มลูกค้า" value={groupFilter} onChange={e => setGroupFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
-        {date !== today && (
-          <button onClick={() => setDate(today)} style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", width: isMobile ? "100%" : undefined }}>
-            วันนี้
-          </button>
-        )}
       </div>
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
@@ -2032,13 +2035,15 @@ const EventLog = ({ trucks, field, title, emptyMsg, doneLabel }) => {
           )}
           {group.lanes.map((ev, i) => (
             <div key={ev.key} style={{ borderTop: i === 0 ? "none" : "1px dashed #e5e7eb", paddingTop: i === 0 ? 0 : 10, marginTop: i === 0 ? 0 : 10 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
-                <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
-                  {ev.laneLabel}
-                </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: ev.photos.length || ev.note ? 8 : 0, flexWrap: "wrap", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
+                    {ev.laneLabel}
+                  </span>
+                  <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>{doneLabel}</span>
+                </div>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
               </div>
-              <div style={{ color: "#16a34a", fontWeight: 700, fontSize: 13, marginBottom: ev.photos.length ? 8 : 0 }}>{doneLabel}</div>
               {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
               {ev.photos.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 64 : 80}px, 1fr))`, gap: 6 }}>
