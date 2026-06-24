@@ -1612,7 +1612,7 @@ const QC = ({ trucks, onUpdate, laneId }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>QC → {actLane.label}</h2>
+      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>ลานโหลด → {actLane.label}</h2>
 
       {flashLane && (
         <div style={{ padding: "13px 16px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
