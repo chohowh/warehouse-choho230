@@ -2852,8 +2852,8 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
 
 // ─── ROLE SELECT (landing page: เลือกตำแหน่งงานก่อนเข้าระบบ) ──────────────────
 const ROLE_OPTIONS = [
-  { id: "qc",          label: "QC",            emoji: "🌡️" },
-  { id: "checker",     label: "ลานโหลด",        emoji: "🥩" },
+  { id: "qc",          label: "ลานโหลด",        emoji: "🌡️" },
+  { id: "checker",     label: "QC",            emoji: "🥩" },
   { id: "loading",     label: "Checker",       img: "/basket.png" },
   { id: "office_wh",   label: "Office คลัง",    emoji: "🖨️" },
   { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
