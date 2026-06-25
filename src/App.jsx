@@ -3054,15 +3054,18 @@ const ROLE_OPTIONS = [
   { id: "all",         label: "ทั้งหมด" },
 ];
 
-const LOADING_TABS = ["dashboard", "loading_parts", "loading_head", "loading_pork"];
+const LOADING_TABS = ["loading_parts", "loading_head", "loading_pork"];
+
+// roles that land on a lane-picker card screen instead of auto-opening a tab
+const LANE_SELECT_ROLES = ["qc", "loading", "checker", "office_wh", "office_plan", "lg"];
 
 const ROLE_TABS = {
-  qc:           ["dashboard", "qc_parts", "qc_head", "qc_pork"],
+  qc:           ["qc_parts", "qc_head", "qc_pork"],
   loading:      LOADING_TABS,
-  checker:      ["dashboard", "sample_parts", "sample_head", "sample_pork"],
-  office_wh:    ["dashboard", "picking"],
-  office_plan:  ["dashboard", "planning", "detail_loading"],
-  lg:           ["dashboard", "lg"],
+  checker:      ["sample_parts", "sample_head", "sample_pork"],
+  office_wh:    ["picking"],
+  office_plan:  ["planning", "detail_loading"],
+  lg:           ["lg"],
   dashboard_only: ["dashboard"],
   loading_data: ["overview_log"],
   all:          null,
@@ -3098,6 +3101,28 @@ const RoleSelect = ({ onSelect }) => {
   );
 };
 
+// ─── LANE SELECT (เลือกเมนูย่อยหลังเลือกตำแหน่งงาน) ───────────────────────────
+const LaneSelect = ({ tabs, roleLabel, onSelect, onBack }) => (
+  <div style={{ height: "100dvh", overflow: "hidden", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+    <div style={{ maxWidth: 420, width: "100%" }}>
+      <h2 style={{ textAlign: "center", fontWeight: 900, fontSize: 20, margin: "0 0 4px" }}>{roleLabel}</h2>
+      <p style={{ textAlign: "center", color: "#6b7280", fontSize: 12, margin: "0 0 28px" }}>เลือกเมนูที่ต้องการเข้าใช้งาน</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => onSelect(t.id)}
+            style={{ background: "#fff", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "16px 14px", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+            <Icon name={t.icon} size={22} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <button onClick={onBack} style={{ marginTop: 24, width: "100%", background: "transparent", border: "none", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "center" }}>
+        ← กลับหน้าเลือกตำแหน่งงาน
+      </button>
+    </div>
+  </div>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3124,6 +3149,10 @@ export default function App() {
   const isMobile = useIsMobile();
   const isNarrow = useIsNarrow();
   const defaultTabForRole = (r) => {
+    if (LANE_SELECT_ROLES.includes(r)) {
+      const allowed = ROLE_TABS[r];
+      return allowed?.length === 1 ? allowed[0] : "";
+    }
     const allowed = ROLE_TABS[r];
     return (allowed && !allowed.includes("dashboard")) ? allowed[0] : "dashboard";
   };
@@ -3352,6 +3381,12 @@ export default function App() {
   // ── Role select (เลือกตำแหน่งงานก่อนเข้าระบบ) ──
   if (!isKioskMode && !role) {
     return <RoleSelect onSelect={handleSelectRole} />;
+  }
+
+  // ── Lane select (เลือกเมนูย่อยหลังเลือกตำแหน่งงาน) ──
+  if (!isKioskMode && role && !tab) {
+    const roleLabel = ROLE_OPTIONS.find(r => r.id === role)?.label || "";
+    return <LaneSelect tabs={visibleTabs} roleLabel={roleLabel} onSelect={setTab} onBack={handleChangeRole} />;
   }
 
   // ── Driver-only mode ──
