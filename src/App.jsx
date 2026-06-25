@@ -2144,6 +2144,11 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
     const bTime = b.loadDoneAt ? workTimeValue(b.loadDoneAt) : workTimeValue(b.doneAt);
     return bTime - aTime;
   });
+  // within each truck, order entries by work step (ลานโหลด → QC → Checker) instead of time
+  const FIELD_ORDER = { qcLanes: 0, sampleLanes: 1, loadLanes: 2 };
+  for (const group of groupsByTruck) {
+    group.lanes.sort((a, b) => FIELD_ORDER[a.field] - FIELD_ORDER[b.field] || workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
+  }
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
