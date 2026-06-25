@@ -2062,6 +2062,7 @@ const buildLaneEvents = (list, sources) => {
           events.push({
             key: `${t.id}_${src.field}_${lane.id}`,
             truckId: t.id,
+            field: src.field,
             plate: t.plate,
             customerGroup: t.customerGroup || "",
             zone: t.zone || "",
@@ -2080,10 +2081,11 @@ const buildLaneEvents = (list, sources) => {
   return events.sort((a, b) => workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
 };
 
-const EventLog = ({ trucks, sources, title, emptyMsg }) => {
+const EventLog = ({ trucks, title, emptyMsg }) => {
   const isMobile = useIsMobile();
   const today = cycleDateStr();
   const [date, setDate] = useState(today);
+  const [sourceFilter, setSourceFilter] = useState("");
   const [plateFilter, setPlateFilter] = useState("");
   const [extraFilter, setExtraFilter] = useState("");
   const [archiveTrucks, setArchiveTrucks] = useState(null);
@@ -2098,8 +2100,10 @@ const EventLog = ({ trucks, sources, title, emptyMsg }) => {
       .finally(() => setLoadingArchive(false));
   }, [date, today]);
 
+  const allSources = Object.values(LOG_SOURCES);
+  const activeSources = sourceFilter ? allSources.filter(s => s.field === sourceFilter) : allSources;
   const sourceTrucks = date === today ? trucks : (archiveTrucks || []);
-  const events = buildLaneEvents(sourceTrucks, sources).filter(ev => {
+  const events = buildLaneEvents(sourceTrucks, activeSources).filter(ev => {
     const matchesPlate = !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase());
     const extraQuery = extraFilter.trim().toLowerCase();
     const matchesExtra = !extraQuery
@@ -2146,8 +2150,14 @@ const EventLog = ({ trucks, sources, title, emptyMsg }) => {
   return (
     <div style={{ maxWidth: 560, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
       <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: isMobile ? 18 : 22 }}>{title}</h2>
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 8 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }}>
+          <option value="">ทั้งหมด</option>
+          {allSources.map(s => <option key={s.field} value={s.field}>{s.filterLabel}</option>)}
+        </select>
+      </div>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
         <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 140 }} />
         <input type="text" placeholder="ค้นหา Zone / กลุ่มลูกค้า / Note" value={extraFilter} onChange={e => setExtraFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }} />
       </div>
@@ -2209,25 +2219,13 @@ const EventLog = ({ trucks, sources, title, emptyMsg }) => {
 };
 
 const LOG_SOURCES = {
-  loadLanes:   { field: "loadLanes",   doneLabel: "✅ โหลดเสร็จแล้ว" },
-  qcLanes:     { field: "qcLanes",     doneLabel: "🌡️ ตรวจสอบอุณหภูมิแล้ว" },
-  sampleLanes: { field: "sampleLanes", doneLabel: "📷 ตรวจแล้ว" },
+  loadLanes:   { field: "loadLanes",   filterLabel: "การโหลดจ่ายสินค้า",      doneLabel: "✅ Checker นับตะกร้าและโหลดเสร็จแล้ว" },
+  qcLanes:     { field: "qcLanes",     filterLabel: "การตรวจอุณหภูมิรถขนส่ง", doneLabel: "🌡️ ลานโหลด ตรวจสอบอุณหภูมิรถแล้ว" },
+  sampleLanes: { field: "sampleLanes", filterLabel: "การตรวจอุณหภูมิสินค้า",   doneLabel: "📷 QC สุ่มตรวจอุณหภูมิสินค้าแล้ว" },
 };
 
-const LoadingLog = ({ trucks }) => (
-  <EventLog trucks={trucks} sources={[LOG_SOURCES.loadLanes]} title="💬 Log การโหลดจ่ายสินค้า" emptyMsg="ยังไม่มีรายการโหลดเสร็จ" />
-);
-
-const QCLog = ({ trucks }) => (
-  <EventLog trucks={trucks} sources={[LOG_SOURCES.qcLanes]} title="💬 Log การตรวจอุณหภูมิรถขนส่ง" emptyMsg="ยังไม่มีรายการตรวจ QC" />
-);
-
-const SampleLog = ({ trucks }) => (
-  <EventLog trucks={trucks} sources={[LOG_SOURCES.sampleLanes]} title="💬 Log การตรวจอุณหภูมิสินค้า" emptyMsg="ยังไม่มีรายการตรวจอุณหภูมิ" />
-);
-
 const OverviewLog = ({ trucks }) => (
-  <EventLog trucks={trucks} sources={[LOG_SOURCES.loadLanes, LOG_SOURCES.qcLanes, LOG_SOURCES.sampleLanes]} title="💬 Log ภาพรวมการทำงาน" emptyMsg="ยังไม่มีรายการทำงาน" />
+  <EventLog trucks={trucks} title="💬 Log ภาพรวมการทำงาน" emptyMsg="ยังไม่มีรายการทำงาน" />
 );
 
 // ── 7. PLANNING ───────────────────────────────────────────────────────────────
@@ -3066,7 +3064,7 @@ const ROLE_TABS = {
   office_plan:  ["dashboard", "planning", "detail_loading"],
   lg:           ["dashboard", "lg"],
   dashboard_only: ["dashboard"],
-  loading_data: ["overview_log", "loading_log", "qc_log", "sample_log"],
+  loading_data: ["overview_log"],
   all:          null,
 };
 
@@ -3330,9 +3328,6 @@ export default function App() {
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
     { id: "overview_log",  label: "Log ภาพรวมการทำงาน", icon: "list" },
-    { id: "loading_log",   label: "Log การโหลดจ่ายสินค้า", icon: "list" },
-    { id: "qc_log",         label: "Log การตรวจอุณหภูมิรถขนส่ง", icon: "temp" },
-    { id: "sample_log",     label: "Log การตรวจอุณหภูมิสินค้า", icon: "camera" },
     { id: "planning",      label: "Invoice",       icon: "plan"      },
     { id: "detail_loading", label: "อัพโหลด PO", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
@@ -3530,9 +3525,6 @@ export default function App() {
         {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
         {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
-        {tab === "loading_log"   && <LoadingLog trucks={trucks} />}
-        {tab === "qc_log"        && <QCLog trucks={trucks} />}
-        {tab === "sample_log"    && <SampleLog trucks={trucks} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
         {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
