@@ -943,6 +943,7 @@ const displayDate = (dateStr, exitTime) => {
 };
 
 const LGUpload = ({ queue, onSetQueue }) => {
+  const isMobile = useIsMobile();
   const [fileName, setFileName] = useState("");
   const [status,   setStatus]   = useState("idle"); // idle | preview | uploading | done | error
   const [extracted, setExtracted] = useState([]);
@@ -1087,17 +1088,30 @@ const LGUpload = ({ queue, onSetQueue }) => {
             <div style={{ fontWeight: 800, fontSize: 14 }}>✅ อ่านข้อมูลได้ {extracted.length} คัน</div>
             <span style={{ fontSize: 12, color: "#6b7280" }}>ตรวจสอบแล้วกด "ยืนยัน"</span>
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 11 : 12 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน"].map(h => (
-                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
+                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา"] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน"]).map(h => (
+                    <th key={h} style={{ padding: isMobile ? "6px 6px" : "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {extracted.map((t, i) => (
+                {extracted.map((t, i) => isMobile ? (
+                  <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "6px 6px", fontWeight: 800 }}>
+                      {t.plate}
+                      <div style={{ fontWeight: 400, color: "#9ca3af", fontSize: 10 }}>{displayDate(t.date, t.exitTime)}</div>
+                    </td>
+                    <td style={{ padding: "6px 6px" }}>{t.customerGroup}</td>
+                    <td style={{ padding: "6px 6px", fontWeight: 700, color: "#7c3aed" }}>{t.zone}</td>
+                    <td style={{ padding: "6px 6px" }}>
+                      <div style={{ fontWeight: 700, color: "#3b82f6" }}>{t.entryTime}</div>
+                      <div style={{ fontWeight: 700, color: "#6b7280" }}>{t.exitTime}</div>
+                    </td>
+                  </tr>
+                ) : (
                   <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "8px 12px", color: "#6b7280" }}>{displayDate(t.date, t.exitTime)}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 800 }}>{t.plate}</td>
@@ -1130,26 +1144,67 @@ const LGUpload = ({ queue, onSetQueue }) => {
         const filteredQueue = queue.filter(q => q.plate.includes(searchQuery));
         return (
         <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               คิวรถวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{filteredQueue.length}</span>
             </div>
             <input type="text" placeholder="🔍 ค้นหาทะเบียนรถ..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              style={{ border: "1px solid #d1d5db", borderRadius: 0, padding: "6px 12px", fontSize: 12, outline: "none", width: 160 }} />
+              style={{ border: "1px solid #d1d5db", borderRadius: 0, padding: "6px 12px", fontSize: 12, outline: "none", width: isMobile ? "100%" : 160 }} />
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 11 : 12 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน",""].map(h => (
-                    <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
+                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา",""] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน",""]).map(h => (
+                    <th key={h} style={{ padding: isMobile ? "6px 6px" : "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filteredQueue.map(q => {
                   const isEditing = editId === q.id;
-                  return (
+                  const actions = isEditing ? (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={saveEdit} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
+                      <button onClick={cancelEdit} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => startEdit(q)} style={{ background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>แก้ไข</button>
+                      <button onClick={() => deleteRow(q.id)} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 0, padding: "4px 8px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ลบ</button>
+                    </div>
+                  );
+                  return isMobile ? (
+                    <tr key={q.id} style={{ borderBottom: "1px solid #f3f4f6", background: isEditing ? "#fffbeb" : undefined }}>
+                      <td style={{ padding: "6px 6px", fontWeight: 800 }}>
+                        {isEditing
+                          ? <input style={inputStyle} value={editData.plate} onChange={e => setEditData(d => ({ ...d, plate: e.target.value }))} />
+                          : <>{q.plate}<div style={{ fontWeight: 400, color: "#9ca3af", fontSize: 10 }}>{displayDate(q.date, q.exitTime)}</div></>}
+                      </td>
+                      <td style={{ padding: "6px 6px" }}>
+                        {isEditing
+                          ? <input style={inputStyle} value={editData.customerGroup} onChange={e => setEditData(d => ({ ...d, customerGroup: e.target.value }))} />
+                          : q.customerGroup}
+                      </td>
+                      <td style={{ padding: "6px 6px", fontWeight: 700, color: "#7c3aed" }}>
+                        {isEditing
+                          ? <input style={inputStyle} value={editData.zone} placeholder="Zone" onChange={e => setEditData(d => ({ ...d, zone: e.target.value }))} />
+                          : q.zone}
+                      </td>
+                      <td style={{ padding: "6px 6px" }}>
+                        {isEditing
+                          ? <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              <input style={inputStyle} value={editData.entryTime} placeholder="เข้า HH:MM" onChange={e => setEditData(d => ({ ...d, entryTime: e.target.value }))} />
+                              <input style={inputStyle} value={editData.exitTime} placeholder="ออก HH:MM" onChange={e => setEditData(d => ({ ...d, exitTime: e.target.value }))} />
+                            </div>
+                          : <>
+                              <div style={{ fontWeight: 700, color: "#3b82f6" }}>{q.entryTime}</div>
+                              <div style={{ fontWeight: 700, color: "#6b7280" }}>{q.exitTime}</div>
+                            </>}
+                      </td>
+                      <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>{actions}</td>
+                    </tr>
+                  ) : (
                     <tr key={q.id} style={{ borderBottom: "1px solid #f3f4f6", background: isEditing ? "#fffbeb" : undefined }}>
                       <td style={{ padding: "8px 12px", color: "#6b7280" }}>{displayDate(q.date, q.exitTime)}</td>
                       <td style={{ padding: "8px 12px", fontWeight: 800 }}>
@@ -1177,23 +1232,32 @@ const LGUpload = ({ queue, onSetQueue }) => {
                           ? <input style={inputStyle} value={editData.exitTime} placeholder="HH:MM" onChange={e => setEditData(d => ({ ...d, exitTime: e.target.value }))} />
                           : q.exitTime}
                       </td>
-                      <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}>
-                        {isEditing ? (
-                          <div style={{ display: "flex", gap: 4 }}>
-                            <button onClick={saveEdit} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
-                            <button onClick={cancelEdit} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", gap: 4 }}>
-                            <button onClick={() => startEdit(q)} style={{ background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>แก้ไข</button>
-                            <button onClick={() => deleteRow(q.id)} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 0, padding: "4px 8px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ลบ</button>
-                          </div>
-                        )}
-                      </td>
+                      <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}>{actions}</td>
                     </tr>
                   );
                 })}
-                {addingManual && (
+                {addingManual && (isMobile ? (
+                  <tr style={{ borderBottom: "1px solid #f3f4f6", background: "#f0fdf4" }}>
+                    <td style={{ padding: "6px 6px" }}>
+                      <input style={{ ...inputStyle, marginBottom: 3 }} placeholder="24/4/2026" value={manualData.date} onChange={e => setManualData(d => ({ ...d, date: e.target.value }))} />
+                      <input style={inputStyle} placeholder="กข-1234" value={manualData.plate} onChange={e => setManualData(d => ({ ...d, plate: e.target.value }))} />
+                    </td>
+                    <td style={{ padding: "6px 6px" }}><input style={inputStyle} placeholder="กลุ่มลูกค้า" value={manualData.customerGroup} onChange={e => setManualData(d => ({ ...d, customerGroup: e.target.value }))} /></td>
+                    <td style={{ padding: "6px 6px" }}><input style={inputStyle} placeholder="Zone" value={manualData.zone} onChange={e => setManualData(d => ({ ...d, zone: e.target.value }))} /></td>
+                    <td style={{ padding: "6px 6px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        <input style={inputStyle} placeholder="เข้า HH:MM" value={manualData.entryTime} onChange={e => setManualData(d => ({ ...d, entryTime: e.target.value }))} />
+                        <input style={inputStyle} placeholder="ออก HH:MM" value={manualData.exitTime} onChange={e => setManualData(d => ({ ...d, exitTime: e.target.value }))} />
+                      </div>
+                    </td>
+                    <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button onClick={saveManual} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
+                        <button onClick={() => setAddingManual(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
                   <tr style={{ borderBottom: "1px solid #f3f4f6", background: "#f0fdf4" }}>
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="24/4/2026" value={manualData.date} onChange={e => setManualData(d => ({ ...d, date: e.target.value }))} /></td>
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="กข-1234" value={manualData.plate} onChange={e => setManualData(d => ({ ...d, plate: e.target.value }))} /></td>
@@ -1208,7 +1272,7 @@ const LGUpload = ({ queue, onSetQueue }) => {
                       </div>
                     </td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -1384,6 +1448,7 @@ const DriverScan = ({ queue, trucks, onScan, skipGeofence }) => {
 
 // ── 3+6. PICKING ──────────────────────────────────────────────────────────────
 const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
+  const isMobile = useIsMobile();
 
   // รวม queue + walk-in (รถที่เข้าแล้วแต่ยังไม่มีในคิว)
   const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
@@ -1457,6 +1522,44 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
     );
   };
 
+  const laneMatch = plate => {
+    const num = plateNum(plate);
+    const matched = num ? Object.entries(detailMap).find(([k]) => plateNum(k) === num) : null;
+    return matched ? matched[1] : new Set();
+  };
+
+  const StatusCell = ({ truck, compact }) => {
+    if (!truck) return <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>รอเช็คอิน</span>;
+    const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
+    if (!anyQC) return <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
+    const fSize = compact ? 10 : 11;
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: compact ? 3 : 5, alignItems: "center" }}>
+        {LOADING_LANES.map(l => {
+          const loaded = truck.loadLanes?.[l.id]?.done;
+          const qcDone = truck.qcLanes?.[l.id]?.done;
+          const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
+          if (loaded) return (
+            <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 0, padding: compact ? "2px 7px 4px 6px" : "3px 10px 5px 8px", fontSize: fSize, fontWeight: 700, lineHeight: 1.4 }}>
+              {l.tinyLabel}
+              <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900 }}>✓</span>
+            </div>
+          );
+          if (waiting) return (
+            <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 0, padding: compact ? "2px 7px 4px 6px" : "3px 10px 5px 8px", fontSize: fSize, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
+              รอสินค้า {l.tinyLabel}
+              <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }}>⏳</span>
+            </div>
+          );
+          if (qcDone) return (
+            <span key={l.id} style={{ fontSize: fSize, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>
+          );
+          return null;
+        })}
+      </div>
+    );
+  };
+
   const Step3Cell = ({ truck }) => {
     if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     if (doneStep3(truck)) return <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
@@ -1486,97 +1589,82 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
       <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>📦 ห้อง Picking</h2>
 
       <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>
             📋 คิวรถวันนี้ <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{filteredRows.length}</span>
           </div>
           <input type="text" placeholder="🔍 ค้นหาทะเบียนรถ..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            style={{ border: "1px solid #d1d5db", borderRadius: 0, padding: "6px 12px", fontSize: 12, outline: "none", width: 160 }} />
+            style={{ border: "1px solid #d1d5db", borderRadius: 0, padding: "6px 12px", fontSize: 12, outline: "none", width: isMobile ? "100%" : 160 }} />
         </div>
         {filteredRows.length === 0
           ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>ยังไม่มีคิวรถ</div>
           : (
           <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 190px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 11 : 12 }}>
               <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["ทะเบียน","กลุ่มลูกค้า"].map(h => (
-                    <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
-                  ))}
-                  {LOADING_LANES.map(l => (
-                    <th key={l.id} style={{ padding: "9px 12px", textAlign: "center", fontWeight: 700, color: l.color, whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{l.tinyLabel}</th>
-                  ))}
-                  {["เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"].map(h => (
-                    <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
+                  {(isMobile
+                    ? ["ทะเบียน","ลาน","เวลา / สถานะ","Action"]
+                    : ["ทะเบียน","กลุ่มลูกค้า", ...LOADING_LANES.map(l => l.tinyLabel), "เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"]
+                  ).map(h => (
+                    <th key={h} style={{ padding: isMobile ? "7px 6px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map(({ key, plate, customerGroup, entryTime, truck }) => (
-                  <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
-                    <td style={{ padding: "10px 12px", color: "#374151" }}>{customerGroup}</td>
-                    {(() => {
-                      const num = plateNum(plate);
-                      const matched = num ? Object.entries(detailMap).find(([k]) => plateNum(k) === num) : null;
-                      const lanes = matched ? matched[1] : new Set();
-                      return LOADING_LANES.map(l => (
+                {filteredRows.map(({ key, plate, customerGroup, entryTime, truck }) => {
+                  const lanes = laneMatch(plate);
+                  return isMobile ? (
+                    <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "8px 6px", fontWeight: 800 }}>
+                        {plate}
+                        <div style={{ fontWeight: 400, color: "#6b7280", fontSize: 10 }}>{customerGroup}</div>
+                      </td>
+                      <td style={{ padding: "8px 6px" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {LOADING_LANES.map(l => (
+                            <span key={l.id} style={{ fontSize: 10, fontWeight: 800, color: lanes.has(l.id) ? l.color : "#d1d5db" }}>
+                              {l.tinyLabel}{lanes.has(l.id) ? "✓" : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px 6px" }}>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
+                        <div style={{ marginTop: 4 }}><StatusCell truck={truck} compact /></div>
+                        <div style={{ marginTop: 4 }}><ExtraStatusCell truck={truck} /></div>
+                      </td>
+                      <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                          <Step3Cell truck={truck} />
+                          <Step6Cell truck={truck} />
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
+                      <td style={{ padding: "10px 12px", color: "#374151" }}>{customerGroup}</td>
+                      {LOADING_LANES.map(l => (
                         <td key={l.id} style={{ padding: "10px 12px", textAlign: "center" }}>
                           {lanes.has(l.id)
                             ? <span style={{ color: l.color, fontWeight: 900, fontSize: 16 }}>✓</span>
                             : <span style={{ color: "#e5e7eb" }}>—</span>}
                         </td>
-                      ));
-                    })()}
-                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                      <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
-                      {truck?.arrivedAt
-                        ? <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
-                        : <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      {!truck
-                        ? <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>รอเช็คอิน</span>
-                        : (() => {
-                            const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
-                            return (
-                              <div>
-                                {!anyQC
-                                  ? <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>
-                                  : <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
-                                      {LOADING_LANES.map(l => {
-                                        const loaded = truck.loadLanes?.[l.id]?.done;
-                                        const qcDone = truck.qcLanes?.[l.id]?.done;
-                                        const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
-                                        if (loaded) return (
-                                          <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#10b981", color: "#fff", borderRadius: 0, padding: "3px 10px 5px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.4 }}>
-                                            {l.tinyLabel}
-                                            <span style={{ position: "absolute", bottom: -4, right: -4, background: "#059669", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 900 }}>✓</span>
-                                          </div>
-                                        );
-                                        if (waiting) return (
-                                          <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 0, padding: "3px 10px 5px 8px", fontSize: 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
-                                            รอสินค้า {l.tinyLabel}
-                                            <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }}>⏳</span>
-                                          </div>
-                                        );
-                                        if (qcDone) return (
-                                          <span key={l.id} style={{ fontSize: 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>
-                                        );
-                                        return null;
-                                      })}
-                                    </div>
-                                }
-                              </div>
-                            );
-                          })()
-                      }
-                    </td>
-                    <td style={{ padding: "10px 12px" }}><ExtraStatusCell truck={truck} /></td>
-                    <td style={{ padding: "10px 12px" }}><Step3Cell truck={truck} /></td>
-                    <td style={{ padding: "10px 12px" }}><Step6Cell truck={truck} /></td>
-                  </tr>
-                ))}
+                      ))}
+                      <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                        <div style={{ fontWeight: 700, color: "#3b82f6" }}>{entryTime || "—"}</div>
+                        {truck?.arrivedAt
+                          ? <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>เข้าจริง {truck.arrivedAt}</div>
+                          : <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>(รถยังไม่เข้าโรงงาน)</div>}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}><StatusCell truck={truck} /></td>
+                      <td style={{ padding: "10px 12px" }}><ExtraStatusCell truck={truck} /></td>
+                      <td style={{ padding: "10px 12px" }}><Step3Cell truck={truck} /></td>
+                      <td style={{ padding: "10px 12px" }}><Step6Cell truck={truck} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
