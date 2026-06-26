@@ -1978,17 +1978,17 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>{curLane.label}</h2>
+      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>Checker {curLane.label}</h2>
 
       {/* ฟอร์มลาน */}
       <div style={{ background: curLane.bg, border: `2px solid ${curLane.border}`, borderRadius: 0, padding: 20, marginBottom: 16 }}>
         {form.flash && (
           <div style={{ padding: "11px 14px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <Icon name="check" size={16} /> บันทึกโหลดเสร็จ → {curLane.label}
+            <Icon name="check" size={16} /> บันทึกโหลดเสร็จ → Checker {curLane.label}
           </div>
         )}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontWeight: 900, fontSize: 16, color: curLane.color }}>{curLane.label}</div>
+          <div style={{ fontWeight: 900, fontSize: 16, color: curLane.color }}>Checker {curLane.label}</div>
         </div>
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 6 }}>เลือกทะเบียนรถ</label>
         <select value={form.selId} onChange={e => setF(activeLane, { selId: e.target.value })}
@@ -3384,9 +3384,9 @@ export default function App() {
     { id: "qc_parts",      label: "ลานโหลด ชิ้นส่วน",      icon: "temp"      },
     { id: "qc_head",       label: "ลานโหลด หัว/เครื่องใน", icon: "temp"      },
     { id: "qc_pork",       label: "ลานโหลด หมูซีก",       icon: "temp"      },
-    { id: "loading_parts", label: "ลานโหลดชิ้นส่วน", icon: "pig_cuts"  },
-    { id: "loading_head",  label: "ลานโหลดหัว/เครื่องใน",  icon: "pig_head"  },
-    { id: "loading_pork",  label: "ลานโหลดหมูซีก",  icon: "pig_side"  },
+    { id: "loading_parts", label: "Checker ลานโหลดชิ้นส่วน", icon: "pig_cuts"  },
+    { id: "loading_head",  label: "Checker ลานโหลดหัว/เครื่องใน",  icon: "pig_head"  },
+    { id: "loading_pork",  label: "Checker ลานโหลดหมูซีก",  icon: "pig_side"  },
     { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
@@ -3473,7 +3473,7 @@ export default function App() {
   if (isLoadingPartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🥩" title="ลานโหลดชิ้นส่วน" color="#c2410c" />
+        <KioskHeader emoji="🥩" title="Checker ลานโหลดชิ้นส่วน" color="#c2410c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
         </div>
@@ -3484,7 +3484,7 @@ export default function App() {
   if (isLoadingHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🐷" title="ลานโหลดหัว/เครื่องใน" color="#7c3aed" />
+        <KioskHeader emoji="🐷" title="Checker ลานโหลดหัว/เครื่องใน" color="#7c3aed" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
         </div>
@@ -3495,7 +3495,7 @@ export default function App() {
   if (isLoadingPorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🐖" title="ลานโหลดหมูซีก" color="#be123c" />
+        <KioskHeader emoji="🐖" title="Checker ลานโหลดหมูซีก" color="#be123c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
         </div>
