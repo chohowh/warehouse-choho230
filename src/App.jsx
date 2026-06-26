@@ -2025,18 +2025,24 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
 };
 
 // ── 6.5 LOADING LOG (chat-style feed of completed loads) ─────────────────────
+// the work-day rolls over at 10:00, not midnight — must stay in sync everywhere
+// a "which work-day does this belong to" decision is made (cycleDateStr,
+// handleReset's archive-date calc, and the two helpers below), otherwise a time
+// or date can get filed under the wrong work-day in one place but not another.
+const WORK_DAY_CUTOFF_HOUR = 10;
+
 const cycleDateStr = () => {
   const d = new Date();
-  if (d.getHours() < 12) d.setDate(d.getDate() - 1);
+  if (d.getHours() < WORK_DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-// doneAt is just "HH:mm"; events before the noon cutoff belong to the work-day's
+// doneAt is just "HH:mm"; events before the cutoff belong to the work-day's
 // *next* calendar date (truck loaded after midnight, e.g. 00:14, still files under
 // the previous work-day) — show that real date next to the time so it's not confusing.
 const formatLogTime = (doneAt, workDate) => {
   const hour = parseInt(doneAt.split(":")[0], 10);
-  if (hour >= 12) return doneAt;
+  if (hour >= WORK_DAY_CUTOFF_HOUR) return doneAt;
   const [y, m, d] = workDate.split("-").map(Number);
   const realDate = new Date(y, m - 1, d + 1);
   const dd = String(realDate.getDate()).padStart(2, "0");
@@ -2044,12 +2050,12 @@ const formatLogTime = (doneAt, workDate) => {
   return `${doneAt} (${dd}/${mm})`;
 };
 
-// converts "HH:mm" into a sortable minute value that respects the noon work-day
-// cutoff: times before noon belong to the *next* calendar day, so they must sort
-// after evening times of the same work-day (e.g. 18:00 < 00:14 next day).
+// converts "HH:mm" into a sortable minute value that respects the work-day
+// cutoff: times before the cutoff belong to the *next* calendar day, so they must
+// sort after evening times of the same work-day (e.g. 18:00 < 00:14 next day).
 const workTimeValue = (doneAt) => {
   const [h, m] = doneAt.split(":").map(Number);
-  return (h < 12 ? h + 24 : h) * 60 + m;
+  return (h < WORK_DAY_CUTOFF_HOUR ? h + 24 : h) * 60 + m;
 };
 
 const buildLaneEvents = (list, sources) => {
@@ -2063,6 +2069,7 @@ const buildLaneEvents = (list, sources) => {
             key: `${t.id}_${src.field}_${lane.id}`,
             truckId: t.id,
             field: src.field,
+            laneId: lane.id,
             plate: t.plate,
             customerGroup: t.customerGroup || "",
             zone: t.zone || "",
@@ -2092,17 +2099,21 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [zoomUrl, setZoomUrl] = useState(null);
 
+  // always check the archive for the selected date — even when it equals "today" by
+  // the wall-clock cutoff — because pressing "ล้างวันใหม่" archives that work-day and
+  // empties the live trucks table before the work-day cutoff passes; without this check
+  // the Log would keep showing the now-empty live data instead of the archived snapshot
   useEffect(() => {
-    if (date === today) { setArchiveTrucks(null); return; }
-    setLoadingArchive(true);
+    setArchiveTrucks(null);
+    setLoadingArchive(date !== today);
     supabase.from("wh_archive").select("trucks").eq("archive_date", date).single()
-      .then(({ data }) => setArchiveTrucks(data?.trucks || []))
+      .then(({ data }) => setArchiveTrucks(data?.trucks ?? null))
       .finally(() => setLoadingArchive(false));
   }, [date, today]);
 
   const allSources = Object.values(LOG_SOURCES);
   const activeSources = sourceFilter ? allSources.filter(s => s.field === sourceFilter) : allSources;
-  const sourceTrucks = date === today ? trucks : (archiveTrucks || []);
+  const sourceTrucks = archiveTrucks ?? (date === today ? trucks : []);
   const events = buildLaneEvents(sourceTrucks, activeSources).filter(ev => {
     const matchesPlate = !plateFilter.trim() || ev.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase());
     const extraQuery = extraFilter.trim().toLowerCase();
@@ -2144,10 +2155,22 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
     const bTime = b.loadDoneAt ? workTimeValue(b.loadDoneAt) : workTimeValue(b.doneAt);
     return bTime - aTime;
   });
-  // within each truck, order entries by work step (ลานโหลด → QC → Checker) instead of time
+  // within each truck, group entries by physical lane (ลานชิ้นส่วน/หัวเครื่องใน/หมูซีก) first —
+  // a truck using multiple lanes shows each lane's full sequence together instead of interleaved —
+  // lane groups are ordered by their most recent activity (the lane that finished first sinks
+  // to the bottom), then by work step (ลานโหลด → QC → Checker), then by time
   const FIELD_ORDER = { qcLanes: 0, sampleLanes: 1, loadLanes: 2 };
   for (const group of groupsByTruck) {
-    group.lanes.sort((a, b) => FIELD_ORDER[a.field] - FIELD_ORDER[b.field] || workTimeValue(a.doneAt) - workTimeValue(b.doneAt));
+    const laneLatest = {};
+    for (const ev of group.lanes) {
+      const t = workTimeValue(ev.doneAt);
+      if (laneLatest[ev.laneId] == null || t > laneLatest[ev.laneId]) laneLatest[ev.laneId] = t;
+    }
+    group.lanes.sort((a, b) =>
+      laneLatest[b.laneId] - laneLatest[a.laneId]
+      || FIELD_ORDER[a.field] - FIELD_ORDER[b.field]
+      || workTimeValue(a.doneAt) - workTimeValue(b.doneAt)
+    );
   }
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
@@ -2823,7 +2846,8 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   // Parse source file (col U=index20=productCode, col BN=index65=plate)
   const parseSourceFile = (file, srcId) => {
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
+      let parsed;
       try {
         let wb;
         if (/\.csv$/i.test(file.name)) {
@@ -2836,7 +2860,7 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
         const dataRows = rows.slice(1).filter(r => r[65] && String(r[65]).trim() !== "");
-        const parsed = dataRows.map(r => ({
+        parsed = dataRows.map(r => ({
           plate:        String(r[65] || "").trim(),
           productCode:  normalizeProductCode(r[20]),
           groupFlag:    String(r[11] || "").trim(),
@@ -2852,10 +2876,17 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
           localStorage.setItem("wh_detail_names", JSON.stringify(next));
           return next;
         });
-        supabase.from("wh_master").upsert({ id: `detail_${srcId}`, data: { rows: parsed, file_name: file.name } });
         onDetailChange(srcId, parsed);
       } catch(e) {
         alert("อ่านไฟล์ไม่สำเร็จ: " + e.message);
+        return;
+      }
+
+      try {
+        const { error } = await supabase.from("wh_master").upsert({ id: `detail_${srcId}`, data: { rows: parsed, file_name: file.name } });
+        if (error) throw error;
+      } catch (e) {
+        alert("บันทึกขึ้นเซิร์ฟเวอร์ไม่สำเร็จ — เครื่องอื่นจะไม่เห็นข้อมูลนี้: " + e.message);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -3304,10 +3335,8 @@ export default function App() {
 
   const handleReset = async () => {
     if (!window.confirm("ล้างข้อมูลทั้งหมดสำหรับวันใหม่?")) return;
-    // archive date = วันรอบงานที่เพิ่งปิด: ก่อนเที่ยง = เมื่อวาน, หลังเที่ยง = วันนี้
-    const _now = new Date();
-    if (_now.getHours() < 12) _now.setDate(_now.getDate() - 1);
-    const archiveDate = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
+    // archive date = วันรอบงานที่เพิ่งปิด (same work-day cutoff as cycleDateStr, kept in sync via that helper)
+    const archiveDate = cycleDateStr();
     await supabase.from("wh_archive").upsert({ archive_date: archiveDate, queue, trucks });
     await supabase.from("wh_queue").delete().neq("id", "");
     await supabase.from("wh_trucks").delete().neq("id", "");
