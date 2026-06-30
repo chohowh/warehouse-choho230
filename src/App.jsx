@@ -3077,6 +3077,147 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   );
 };
 
+// ─── WORK TRACKING (KPI Dashboard) ──────────────────────────────────────────
+const WorkTracking = ({ trucks, queue }) => {
+  const isMobile = useIsMobile();
+  const today = cycleDateStr();
+  const [date, setDate] = useState(today);
+  const [archiveData, setArchiveData] = useState(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+
+  useEffect(() => {
+    setArchiveData(null);
+    setLoadingArchive(date !== today);
+    supabase.from("wh_archive").select("trucks, queue").eq("archive_date", date).single()
+      .then(({ data }) => setArchiveData(data ?? null))
+      .finally(() => setLoadingArchive(false));
+  }, [date, today]);
+
+  const activeTrucks = archiveData?.trucks ?? (date === today ? trucks : []);
+  const activeQueue  = archiveData?.queue  ?? (date === today ? queue  : []);
+
+  const timeDiffMins = (from, to) => {
+    if (!from || !to) return null;
+    const diff = workTimeValue(to) - workTimeValue(from);
+    return diff >= 0 ? diff : null;
+  };
+
+  const fmtDuration = (mins) => {
+    if (mins == null || isNaN(mins)) return "—";
+    if (mins >= 60) return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")} ชม.`;
+    return `${mins} น.`;
+  };
+
+  const avgArr = (arr) => {
+    const valid = arr.filter(v => v != null);
+    return valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+  };
+
+  const totalTrucks = activeTrucks.length;
+  const invoiced    = activeTrucks.filter(t => t.status === "invoiced").length;
+  const inProgress  = activeTrucks.filter(t => t.status !== "invoiced").length;
+  const plateNum    = s => (String(s).match(/\d+/g) || []).pop() || "";
+  const waiting     = activeQueue.filter(q => !activeTrucks.find(t => t.queueId === q.id)).length;
+
+  const laneStats = LOADING_LANES.map(lane => {
+    const qcTimes   = activeTrucks.map(t => timeDiffMins(t.arrivedAt, t.qcLanes?.[lane.id]?.doneAt)).filter(v => v != null);
+    const loadTimes = activeTrucks.map(t => timeDiffMins(t.qcLanes?.[lane.id]?.doneAt, t.loadLanes?.[lane.id]?.doneAt)).filter(v => v != null);
+    return { ...lane, qcAvg: avgArr(qcTimes), loadAvg: avgArr(loadTimes), count: activeTrucks.filter(t => t.loadLanes?.[lane.id]?.done).length };
+  });
+
+  const stdActDiffs = activeTrucks.map(t => {
+    const q = activeQueue.find(q => q.id === t.queueId) || activeQueue.find(q => plateNum(q.plate) === plateNum(t.plate) && plateNum(q.plate) !== "");
+    if (!q?.entryTime || !t.arrivedAt) return null;
+    return workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime);
+  }).filter(v => v != null);
+  const avgDelay = avgArr(stdActDiffs);
+  const onTime   = stdActDiffs.filter(d => d <= 0).length;
+  const late     = stdActDiffs.filter(d => d > 0).length;
+
+  const KpiCard = ({ label, value, sub, color }) => (
+    <div style={{ background: "#fff", borderRadius: 0, padding: isMobile ? "14px 14px" : "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", flex: 1, minWidth: 110, borderTop: `3px solid ${color}` }}>
+      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 900, color, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: isMobile ? 18 : 20 }}>📊 Tracking การทำงาน</h2>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "8px 12px", fontSize: 14, fontWeight: 600, outline: "none" }} />
+      </div>
+
+      {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 40 }}>กำลังโหลด...</div>}
+
+      {!loadingArchive && (
+        <>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+            <KpiCard label="รถทั้งหมด"       value={totalTrucks} sub="คัน"  color="#3b82f6" />
+            <KpiCard label="Invoice แล้ว"    value={invoiced}    sub={`${totalTrucks ? Math.round(invoiced / totalTrucks * 100) : 0}%`} color="#10b981" />
+            <KpiCard label="กำลังดำเนินการ"  value={inProgress}  sub="คัน"  color="#f97316" />
+            <KpiCard label="รอเช็คอิน"       value={waiting}     sub="คัน"  color="#8b5cf6" />
+          </div>
+
+          <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", marginBottom: 20, overflow: "hidden" }}>
+            <div style={{ background: "#f9fafb", padding: "12px 16px", borderBottom: "1px solid #e5e7eb", fontWeight: 700, fontSize: 14 }}>
+              ⏱ เฉลี่ยเวลาการทำงานแต่ละลาน
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#f9fafb" }}>
+                  {["ลาน", "โหลดแล้ว", "เฉลี่ยรอ QC", "เฉลี่ยเวลาโหลด"].map(h => (
+                    <th key={h} style={{ padding: "10px 16px", textAlign: h === "ลาน" ? "left" : "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", fontSize: 12 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {laneStats.map(l => (
+                  <tr key={l.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: l.bg, color: l.color, padding: "3px 10px", fontWeight: 700, fontSize: 12 }}>{l.tinyLabel}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "center", fontWeight: 700, color: "#374151" }}>{l.count} คัน</td>
+                    <td style={{ padding: "12px 16px", textAlign: "center", color: "#6b7280" }}>{fmtDuration(l.qcAvg)}</td>
+                    <td style={{ padding: "12px 16px", textAlign: "center", color: "#6b7280" }}>{fmtDuration(l.loadAvg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
+            <div style={{ background: "#f9fafb", padding: "12px 16px", borderBottom: "1px solid #e5e7eb", fontWeight: 700, fontSize: 14 }}>
+              🕐 เปรียบเทียบเวลาเข้าโรงงาน STD vs ACT
+            </div>
+            <div style={{ padding: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตรงเวลา / เร็วกว่า</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#16a34a" }}>{onTime}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>คัน</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ช้ากว่า STD</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: "#dc2626" }}>{late}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>คัน</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#fafafa", border: "1px solid #e5e7eb" }}>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เฉลี่ย delay</div>
+                <div style={{ fontSize: 26, fontWeight: 900, color: avgDelay != null && avgDelay > 0 ? "#dc2626" : "#16a34a" }}>
+                  {avgDelay != null ? (avgDelay > 0 ? `+${avgDelay}` : `${avgDelay}`) : "—"}
+                </div>
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>นาที</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── ROLE SELECT (landing page: เลือกตำแหน่งงานก่อนเข้าระบบ) ──────────────────
 const ROLE_OPTIONS = [
   { id: "qc",          label: "ลานโหลด",        emoji: "🌡️" },
@@ -3087,6 +3228,7 @@ const ROLE_OPTIONS = [
   { id: "lg",          label: "LG",            emoji: "⬆️" },
   { id: "dashboard_only", label: "Dashboard" },
   { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
+  { id: "tracking",    label: "Tracking การทำงาน",  emoji: "📊" },
   { id: "all",         label: "ทั้งหมด" },
 ];
 
@@ -3104,6 +3246,7 @@ const ROLE_TABS = {
   lg:           ["lg"],
   dashboard_only: ["dashboard"],
   loading_data: ["overview_log"],
+  tracking:     ["work_tracking"],
   all:          null,
 };
 
@@ -3390,7 +3533,8 @@ export default function App() {
     { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
-    { id: "overview_log",  label: "Log ภาพรวมการทำงาน", icon: "list" },
+    { id: "overview_log",   label: "Log ภาพรวมการทำงาน",  icon: "list"  },
+    { id: "work_tracking",  label: "Tracking การทำงาน",  icon: "chart" },
     { id: "planning",      label: "Invoice",       icon: "plan"      },
     { id: "detail_loading", label: "อัพโหลด PO", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
@@ -3594,6 +3738,7 @@ export default function App() {
         {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
         {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
+        {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
         {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
