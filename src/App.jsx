@@ -3182,13 +3182,13 @@ const WorkTracking = ({ trucks, queue }) => {
     <div>
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>📊 Tracking การทำงาน</h2>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>Tracking การทำงาน</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input type="date" value={date} onChange={e => setDate(e.target.value)}
             style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "7px 11px", fontSize: 13, fontWeight: 600, outline: "none" }} />
           <button onClick={exportExcel}
             style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-            ⬇️ Export Excel
+            Export Excel
           </button>
         </div>
       </div>
