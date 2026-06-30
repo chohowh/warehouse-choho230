@@ -3077,13 +3077,26 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   );
 };
 
-// ─── WORK TRACKING (KPI Dashboard) ──────────────────────────────────────────
+// ─── WORK TRACKING (Power BI–style matrix table) ─────────────────────────────
+const WT_GROUPS = [
+  { id: "info",   label: "",                      span: 2, dark: "#0f172a", mid: "#1e293b" },
+  { id: "entry",  label: "เข้าโรงงาน / เบิกสินค้า", span: 3, dark: "#1d4ed8", mid: "#2563eb" },
+  { id: "parts",  label: "🥩 ลานชิ้นส่วน",        span: 2, dark: "#c2410c", mid: "#ea580c" },
+  { id: "head",   label: "🐷 ลานหัว/เครื่องใน",    span: 2, dark: "#6d28d9", mid: "#7c3aed" },
+  { id: "pork",   label: "🐖 ลานหมูซีก",           span: 2, dark: "#9f1239", mid: "#be123c" },
+  { id: "docs",   label: "เอกสาร",                span: 2, dark: "#0d9488", mid: "#0f766e" },
+  { id: "status", label: "",                      span: 1, dark: "#374151", mid: "#4b5563" },
+];
+const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
+const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", status: "#f9fafb" };
+
 const WorkTracking = ({ trucks, queue }) => {
-  const isMobile = useIsMobile();
   const today = cycleDateStr();
-  const [date, setDate] = useState(today);
+  const [date, setDate]       = useState(today);
   const [archiveData, setArchiveData] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
+  const [sortCol, setSortCol] = useState("arrivedAt");
+  const [sortDir, setSortDir] = useState(1);
 
   useEffect(() => {
     setArchiveData(null);
@@ -3095,124 +3108,177 @@ const WorkTracking = ({ trucks, queue }) => {
 
   const activeTrucks = archiveData?.trucks ?? (date === today ? trucks : []);
   const activeQueue  = archiveData?.queue  ?? (date === today ? queue  : []);
+  const pNum = s => (String(s).match(/\d+/g) || []).pop() || "";
+  const getQ = t => activeQueue.find(q => q.id === t.queueId) || activeQueue.find(q => pNum(q.plate) === pNum(t.plate) && pNum(q.plate) !== "");
 
-  const timeDiffMins = (from, to) => {
-    if (!from || !to) return null;
-    const diff = workTimeValue(to) - workTimeValue(from);
-    return diff >= 0 ? diff : null;
+  const COLS = [
+    { id: "plate",            grp: "info",   label: "ทะเบียน",    align: "left",   get: t => t.plate },
+    { id: "customerGroup",    grp: "info",   label: "กลุ่มลูกค้า", align: "left",   get: t => t.customerGroup || "—" },
+    { id: "entrySTD",         grp: "entry",  label: "STD เข้า",   align: "center", get: t => getQ(t)?.entryTime },
+    { id: "arrivedAt",        grp: "entry",  label: "ACT เข้า",   align: "center", get: t => t.arrivedAt },
+    { id: "pickingAt",        grp: "entry",  label: "พิมพ์เบิก",  align: "center", get: t => t.pickingAt },
+    { id: "qc_parts",         grp: "parts",  label: "QC",          align: "center", get: t => t.qcLanes?.lane_parts?.doneAt },
+    { id: "load_parts",       grp: "parts",  label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_parts?.doneAt },
+    { id: "qc_head",          grp: "head",   label: "QC",          align: "center", get: t => t.qcLanes?.lane_head?.doneAt },
+    { id: "load_head",        grp: "head",   label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_head?.doneAt },
+    { id: "qc_pork",          grp: "pork",   label: "QC",          align: "center", get: t => t.qcLanes?.lane_pork?.doneAt },
+    { id: "load_pork",        grp: "pork",   label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_pork?.doneAt },
+    { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",     align: "center", get: t => t.summaryPrintedAt },
+    { id: "invoicedAt",       grp: "docs",   label: "Invoice",     align: "center", get: t => t.invoicedAt },
+    { id: "status",           grp: "status", label: "สถานะ",      align: "center", get: t => t.status },
+  ];
+
+  const isTimeCol = id => !["plate","customerGroup","status"].includes(id);
+
+  const handleSort = (id) => {
+    if (!isTimeCol(id) && id !== "plate" && id !== "customerGroup") return;
+    setSortCol(c => { if (c === id) { setSortDir(d => d === 1 ? -1 : 1); return c; } setSortDir(1); return id; });
   };
 
-  const fmtDuration = (mins) => {
-    if (mins == null || isNaN(mins)) return "—";
-    if (mins >= 60) return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")} ชม.`;
-    return `${mins} น.`;
+  const sortVal = (t, colId) => {
+    const col = COLS.find(c => c.id === colId);
+    const v = col?.get(t);
+    if (!v) return sortDir === 1 ? "zz" : "";
+    if (isTimeCol(colId) && colId !== "customerGroup" && colId !== "plate") {
+      const n = workTimeValue(v);
+      return String(n).padStart(5, "0");
+    }
+    return v;
   };
 
-  const avgArr = (arr) => {
-    const valid = arr.filter(v => v != null);
-    return valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
-  };
-
-  const totalTrucks = activeTrucks.length;
-  const invoiced    = activeTrucks.filter(t => t.status === "invoiced").length;
-  const inProgress  = activeTrucks.filter(t => t.status !== "invoiced").length;
-  const plateNum    = s => (String(s).match(/\d+/g) || []).pop() || "";
-  const waiting     = activeQueue.filter(q => !activeTrucks.find(t => t.queueId === q.id)).length;
-
-  const laneStats = LOADING_LANES.map(lane => {
-    const qcTimes   = activeTrucks.map(t => timeDiffMins(t.arrivedAt, t.qcLanes?.[lane.id]?.doneAt)).filter(v => v != null);
-    const loadTimes = activeTrucks.map(t => timeDiffMins(t.qcLanes?.[lane.id]?.doneAt, t.loadLanes?.[lane.id]?.doneAt)).filter(v => v != null);
-    return { ...lane, qcAvg: avgArr(qcTimes), loadAvg: avgArr(loadTimes), count: activeTrucks.filter(t => t.loadLanes?.[lane.id]?.done).length };
+  const sorted = [...activeTrucks].sort((a, b) => {
+    const va = sortVal(a, sortCol), vb = sortVal(b, sortCol);
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
   });
 
-  const stdActDiffs = activeTrucks.map(t => {
-    const q = activeQueue.find(q => q.id === t.queueId) || activeQueue.find(q => plateNum(q.plate) === plateNum(t.plate) && plateNum(q.plate) !== "");
-    if (!q?.entryTime || !t.arrivedAt) return null;
-    return workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime);
-  }).filter(v => v != null);
-  const avgDelay = avgArr(stdActDiffs);
-  const onTime   = stdActDiffs.filter(d => d <= 0).length;
-  const late     = stdActDiffs.filter(d => d > 0).length;
+  const total    = activeTrucks.length;
+  const doneInv  = activeTrucks.filter(t => t.status === "invoiced").length;
+  const loading  = activeTrucks.filter(t => ["arrived","picking"].includes(t.status)).length;
+  const waiting  = activeQueue.filter(q => !activeTrucks.find(t => t.queueId === q.id)).length;
 
-  const KpiCard = ({ label, value, sub, color }) => (
-    <div style={{ background: "#fff", borderRadius: 0, padding: isMobile ? "14px 14px" : "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", flex: 1, minWidth: 110, borderTop: `3px solid ${color}` }}>
-      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 900, color, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
+  const thBase = { padding: "7px 10px", fontWeight: 700, whiteSpace: "nowrap", userSelect: "none", borderRight: "1px solid rgba(255,255,255,0.18)" };
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <h2 style={{ margin: 0, fontWeight: 900, fontSize: isMobile ? 18 : 20 }}>📊 Tracking การทำงาน</h2>
+    <div>
+      {/* Top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>📊 Tracking การทำงาน</h2>
+          {[
+            { label: "รถทั้งหมด",  value: total,   color: "#3b82f6" },
+            { label: "Invoice",    value: doneInv, color: "#10b981" },
+            { label: "โหลดอยู่",  value: loading, color: "#f97316" },
+            { label: "รอเข้า",    value: waiting, color: "#8b5cf6" },
+          ].map(k => (
+            <div key={k.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <span style={{ fontSize: 20, fontWeight: 900, color: k.color }}>{k.value}</span>
+              <span style={{ fontSize: 11, color: "#6b7280" }}>{k.label}</span>
+            </div>
+          ))}
+        </div>
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "8px 12px", fontSize: 14, fontWeight: 600, outline: "none" }} />
+          style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "7px 11px", fontSize: 13, fontWeight: 600, outline: "none" }} />
       </div>
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 40 }}>กำลังโหลด...</div>}
 
       {!loadingArchive && (
-        <>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-            <KpiCard label="รถทั้งหมด"       value={totalTrucks} sub="คัน"  color="#3b82f6" />
-            <KpiCard label="Invoice แล้ว"    value={invoiced}    sub={`${totalTrucks ? Math.round(invoiced / totalTrucks * 100) : 0}%`} color="#10b981" />
-            <KpiCard label="กำลังดำเนินการ"  value={inProgress}  sub="คัน"  color="#f97316" />
-            <KpiCard label="รอเช็คอิน"       value={waiting}     sub="คัน"  color="#8b5cf6" />
-          </div>
-
-          <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", marginBottom: 20, overflow: "hidden" }}>
-            <div style={{ background: "#f9fafb", padding: "12px 16px", borderBottom: "1px solid #e5e7eb", fontWeight: 700, fontSize: 14 }}>
-              ⏱ เฉลี่ยเวลาการทำงานแต่ละลาน
-            </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: "#f9fafb" }}>
-                  {["ลาน", "โหลดแล้ว", "เฉลี่ยรอ QC", "เฉลี่ยเวลาโหลด"].map(h => (
-                    <th key={h} style={{ padding: "10px 16px", textAlign: h === "ลาน" ? "left" : "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", fontSize: 12 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {laneStats.map(l => (
-                  <tr key={l.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <span style={{ background: l.bg, color: l.color, padding: "3px 10px", fontWeight: 700, fontSize: 12 }}>{l.tinyLabel}</span>
-                    </td>
-                    <td style={{ padding: "12px 16px", textAlign: "center", fontWeight: 700, color: "#374151" }}>{l.count} คัน</td>
-                    <td style={{ padding: "12px 16px", textAlign: "center", color: "#6b7280" }}>{fmtDuration(l.qcAvg)}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "center", color: "#6b7280" }}>{fmtDuration(l.loadAvg)}</td>
-                  </tr>
+        <div style={{ overflowX: "auto", boxShadow: "0 4px 16px rgba(0,0,0,0.12)", borderRadius: 0 }}>
+          <table style={{ borderCollapse: "collapse", minWidth: 980, width: "100%", fontSize: 12 }}>
+            <thead>
+              {/* Group header row */}
+              <tr>
+                {WT_GROUPS.map(g => (
+                  <th key={g.id} colSpan={g.span}
+                    style={{ ...thBase, background: g.dark, color: "#fff", fontSize: 11, textAlign: "center", padding: "9px 10px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
+                    {g.label}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+              {/* Column header row */}
+              <tr>
+                {COLS.map(col => {
+                  const g = WT_GROUP_MAP[col.grp];
+                  const sorted_ = sortCol === col.id;
+                  return (
+                    <th key={col.id} onClick={() => handleSort(col.id)}
+                      style={{ ...thBase, background: g.mid, color: "#fff", fontSize: 11, textAlign: col.align, cursor: "pointer", padding: "7px 10px" }}>
+                      {col.label}{sorted_ ? (sortDir === 1 ? " ▲" : " ▼") : ""}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 && (
+                <tr><td colSpan={COLS.length} style={{ textAlign: "center", color: "#9ca3af", padding: 40, background: "#fff" }}>ยังไม่มีข้อมูลในวันนี้</td></tr>
+              )}
+              {sorted.map((t, i) => {
+                const q = getQ(t);
+                const stdDiff = q?.entryTime && t.arrivedAt ? workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime) : null;
+                return (
+                  <tr key={t.id} style={{ borderBottom: "1px solid #e5e7eb" }}
+                    onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.96)"}
+                    onMouseLeave={e => e.currentTarget.style.filter = ""}>
+                    {COLS.map(col => {
+                      const cellBg = i % 2 === 0 ? WT_CELL_BG[col.grp] : "#fff";
+                      const val = col.get(t);
 
-          <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
-            <div style={{ background: "#f9fafb", padding: "12px 16px", borderBottom: "1px solid #e5e7eb", fontWeight: 700, fontSize: 14 }}>
-              🕐 เปรียบเทียบเวลาเข้าโรงงาน STD vs ACT
-            </div>
-            <div style={{ padding: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตรงเวลา / เร็วกว่า</div>
-                <div style={{ fontSize: 26, fontWeight: 900, color: "#16a34a" }}>{onTime}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>คัน</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#fef2f2", border: "1px solid #fecaca" }}>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ช้ากว่า STD</div>
-                <div style={{ fontSize: 26, fontWeight: 900, color: "#dc2626" }}>{late}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>คัน</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 110, textAlign: "center", padding: 14, background: "#fafafa", border: "1px solid #e5e7eb" }}>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เฉลี่ย delay</div>
-                <div style={{ fontSize: 26, fontWeight: 900, color: avgDelay != null && avgDelay > 0 ? "#dc2626" : "#16a34a" }}>
-                  {avgDelay != null ? (avgDelay > 0 ? `+${avgDelay}` : `${avgDelay}`) : "—"}
-                </div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>นาที</div>
-              </div>
-            </div>
-          </div>
-        </>
+                      if (col.id === "plate") return (
+                        <td key={col.id} style={{ padding: "9px 12px", background: cellBg, borderRight: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>
+                          <span style={{ fontWeight: 900, fontSize: 13, letterSpacing: 0.5 }}>{val}</span>
+                        </td>
+                      );
+
+                      if (col.id === "customerGroup") return (
+                        <td key={col.id} style={{ padding: "9px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 12, color: "#374151" }}>{val || "—"}</span>
+                        </td>
+                      );
+
+                      if (col.id === "status") {
+                        const s = STATUS_META[val];
+                        return (
+                          <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
+                            {s ? <span style={{ background: s.bg, color: s.color, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{s.label}</span>
+                               : <span style={{ color: "#d1d5db" }}>—</span>}
+                          </td>
+                        );
+                      }
+
+                      if (col.id === "arrivedAt") {
+                        const late = stdDiff != null && stdDiff > 0;
+                        const early = stdDiff != null && stdDiff < 0;
+                        return (
+                          <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
+                            {val
+                              ? <span>
+                                  <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>{val}</span>
+                                  {stdDiff != null && <span style={{ fontSize: 10, color: late ? "#dc2626" : "#16a34a", marginLeft: 3 }}>
+                                    {late ? `+${stdDiff}′` : stdDiff < 0 ? `${stdDiff}′` : ""}
+                                  </span>}
+                                </span>
+                              : <span style={{ color: "#d1d5db" }}>—</span>}
+                          </td>
+                        );
+                      }
+
+                      // Generic time cell
+                      const g = WT_GROUP_MAP[col.grp];
+                      return (
+                        <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
+                          {val
+                            ? <span style={{ fontWeight: 700, color: g.mid, fontSize: 13 }}>{val}</span>
+                            : <span style={{ color: "#e5e7eb" }}>—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -3722,7 +3788,7 @@ export default function App() {
         </div>
         {!isNarrow && <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
       </div>
-      <div style={{ maxWidth: tab === "dashboard" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
+      <div style={{ maxWidth: tab === "dashboard" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
         {tab === "qr"        && <QRCodePage />}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
