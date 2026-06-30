@@ -3085,9 +3085,10 @@ const WT_GROUPS = [
   { id: "head",  label: "🐷 ลานหัว/เครื่องใน",     span: 3, dark: "#6d28d9", mid: "#7c3aed" },
   { id: "pork",  label: "🐖 ลานหมูซีก",            span: 3, dark: "#9f1239", mid: "#be123c" },
   { id: "docs",  label: "เอกสาร",                 span: 2, dark: "#0d9488", mid: "#0f766e" },
+  { id: "exit",  label: "ออกโรงงาน",              span: 1, dark: "#475569", mid: "#64748b" },
 ];
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
-const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa" };
+const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", exit: "#f8fafc" };
 
 const WorkTracking = ({ trucks, queue }) => {
   const today = cycleDateStr();
@@ -3125,8 +3126,9 @@ const WorkTracking = ({ trucks, queue }) => {
     { id: "qc_pork",      grp: "pork",  label: "ตรวจอุณหภูมิรถ", align: "center", get: t => t.qcLanes?.lane_pork?.doneAt },
     { id: "sample_pork",  grp: "pork",  label: "QC",              align: "center", get: t => t.sampleLanes?.lane_pork?.doneAt },
     { id: "load_pork",    grp: "pork",  label: "โหลดเสร็จ",      align: "center", get: t => t.loadLanes?.lane_pork?.doneAt },
-    { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",      align: "center", get: t => t.summaryPrintedAt },
-    { id: "invoicedAt",       grp: "docs",   label: "Invoice",      align: "center", get: t => t.invoicedAt },
+    { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",         align: "center", get: t => t.summaryPrintedAt },
+    { id: "invoicedAt",       grp: "docs",   label: "Invoice",         align: "center", get: t => t.invoicedAt },
+    { id: "exitSTD",          grp: "exit",   label: "STD ออก",         align: "center", get: t => getQ(t)?.exitTime },
   ];
 
   const isTimeCol = id => !["plate","customerGroup"].includes(id);
@@ -3176,6 +3178,7 @@ const WorkTracking = ({ trucks, queue }) => {
         "โหลด หมูซีก":            t.loadLanes?.lane_pork?.doneAt || "",
         "ใบสรุป":                t.summaryPrintedAt || "",
         "Invoice":               t.invoicedAt || "",
+        "STD ออก":               q?.exitTime || "",
       };
     });
     const ws = XLSX.utils.json_to_sheet(rows);
