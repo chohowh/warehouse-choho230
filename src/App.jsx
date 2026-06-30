@@ -3079,16 +3079,15 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
 
 // ─── WORK TRACKING (Power BI–style matrix table) ─────────────────────────────
 const WT_GROUPS = [
-  { id: "info",   label: "",                      span: 2, dark: "#0f172a", mid: "#1e293b" },
-  { id: "entry",  label: "เข้าโรงงาน / เบิกสินค้า", span: 3, dark: "#1d4ed8", mid: "#2563eb" },
-  { id: "parts",  label: "🥩 ลานชิ้นส่วน",        span: 2, dark: "#c2410c", mid: "#ea580c" },
-  { id: "head",   label: "🐷 ลานหัว/เครื่องใน",    span: 2, dark: "#6d28d9", mid: "#7c3aed" },
-  { id: "pork",   label: "🐖 ลานหมูซีก",           span: 2, dark: "#9f1239", mid: "#be123c" },
-  { id: "docs",   label: "เอกสาร",                span: 2, dark: "#0d9488", mid: "#0f766e" },
-  { id: "status", label: "",                      span: 1, dark: "#374151", mid: "#4b5563" },
+  { id: "info",  label: "",                       span: 2, dark: "#0f172a", mid: "#1e293b" },
+  { id: "entry", label: "เข้าโรงงาน / เบิกสินค้า", span: 3, dark: "#1d4ed8", mid: "#2563eb" },
+  { id: "parts", label: "🥩 ลานชิ้นส่วน",         span: 2, dark: "#c2410c", mid: "#ea580c" },
+  { id: "head",  label: "🐷 ลานหัว/เครื่องใน",     span: 2, dark: "#6d28d9", mid: "#7c3aed" },
+  { id: "pork",  label: "🐖 ลานหมูซีก",            span: 2, dark: "#9f1239", mid: "#be123c" },
+  { id: "docs",  label: "เอกสาร",                 span: 2, dark: "#0d9488", mid: "#0f766e" },
 ];
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
-const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", status: "#f9fafb" };
+const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa" };
 
 const WorkTracking = ({ trucks, queue }) => {
   const today = cycleDateStr();
@@ -3116,19 +3115,18 @@ const WorkTracking = ({ trucks, queue }) => {
     { id: "customerGroup",    grp: "info",   label: "กลุ่มลูกค้า", align: "left",   get: t => t.customerGroup || "—" },
     { id: "entrySTD",         grp: "entry",  label: "STD เข้า",   align: "center", get: t => getQ(t)?.entryTime },
     { id: "arrivedAt",        grp: "entry",  label: "ACT เข้า",   align: "center", get: t => t.arrivedAt },
-    { id: "pickingAt",        grp: "entry",  label: "พิมพ์เบิก",  align: "center", get: t => t.pickingAt },
-    { id: "qc_parts",         grp: "parts",  label: "QC",          align: "center", get: t => t.qcLanes?.lane_parts?.doneAt },
-    { id: "load_parts",       grp: "parts",  label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_parts?.doneAt },
-    { id: "qc_head",          grp: "head",   label: "QC",          align: "center", get: t => t.qcLanes?.lane_head?.doneAt },
-    { id: "load_head",        grp: "head",   label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_head?.doneAt },
-    { id: "qc_pork",          grp: "pork",   label: "QC",          align: "center", get: t => t.qcLanes?.lane_pork?.doneAt },
-    { id: "load_pork",        grp: "pork",   label: "โหลดเสร็จ",  align: "center", get: t => t.loadLanes?.lane_pork?.doneAt },
-    { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",     align: "center", get: t => t.summaryPrintedAt },
-    { id: "invoicedAt",       grp: "docs",   label: "Invoice",     align: "center", get: t => t.invoicedAt },
-    { id: "status",           grp: "status", label: "สถานะ",      align: "center", get: t => t.status },
+    { id: "pickingAt",        grp: "entry",  label: "พิมพ์ใบเบิก", align: "center", get: t => t.pickingAt },
+    { id: "qc_parts",         grp: "parts",  label: "QC",           align: "center", get: t => t.qcLanes?.lane_parts?.doneAt },
+    { id: "load_parts",       grp: "parts",  label: "โหลดเสร็จ",   align: "center", get: t => t.loadLanes?.lane_parts?.doneAt },
+    { id: "qc_head",          grp: "head",   label: "QC",           align: "center", get: t => t.qcLanes?.lane_head?.doneAt },
+    { id: "load_head",        grp: "head",   label: "โหลดเสร็จ",   align: "center", get: t => t.loadLanes?.lane_head?.doneAt },
+    { id: "qc_pork",          grp: "pork",   label: "QC",           align: "center", get: t => t.qcLanes?.lane_pork?.doneAt },
+    { id: "load_pork",        grp: "pork",   label: "โหลดเสร็จ",   align: "center", get: t => t.loadLanes?.lane_pork?.doneAt },
+    { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",      align: "center", get: t => t.summaryPrintedAt },
+    { id: "invoicedAt",       grp: "docs",   label: "Invoice",      align: "center", get: t => t.invoicedAt },
   ];
 
-  const isTimeCol = id => !["plate","customerGroup","status"].includes(id);
+  const isTimeCol = id => !["plate","customerGroup"].includes(id);
 
   const handleSort = (id) => {
     if (!isTimeCol(id) && id !== "plate" && id !== "customerGroup") return;
@@ -3139,7 +3137,7 @@ const WorkTracking = ({ trucks, queue }) => {
     const col = COLS.find(c => c.id === colId);
     const v = col?.get(t);
     if (!v) return sortDir === 1 ? "zz" : "";
-    if (isTimeCol(colId) && colId !== "customerGroup" && colId !== "plate") {
+    if (isTimeCol(colId) && colId !== "customerGroup") {
       const n = workTimeValue(v);
       return String(n).padStart(5, "0");
     }
@@ -3151,33 +3149,48 @@ const WorkTracking = ({ trucks, queue }) => {
     return va < vb ? -sortDir : va > vb ? sortDir : 0;
   });
 
-  const total    = activeTrucks.length;
-  const doneInv  = activeTrucks.filter(t => t.status === "invoiced").length;
-  const loading  = activeTrucks.filter(t => ["arrived","picking"].includes(t.status)).length;
-  const waiting  = activeQueue.filter(q => !activeTrucks.find(t => t.queueId === q.id)).length;
-
   const thBase = { padding: "7px 10px", fontWeight: 700, whiteSpace: "nowrap", userSelect: "none", borderRight: "1px solid rgba(255,255,255,0.18)" };
+
+  const exportExcel = () => {
+    const rows = sorted.map(t => {
+      const q = getQ(t);
+      const stdDiff = q?.entryTime && t.arrivedAt ? workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime) : null;
+      return {
+        "ทะเบียน":               t.plate || "",
+        "กลุ่มลูกค้า":           t.customerGroup || "",
+        "STD เข้า":              q?.entryTime || "",
+        "ACT เข้า":              t.arrivedAt || "",
+        "ต่าง STD (นาที)":       stdDiff ?? "",
+        "พิมพ์ใบเบิก":           t.pickingAt || "",
+        "QC ชิ้นส่วน":           t.qcLanes?.lane_parts?.doneAt || "",
+        "โหลด ชิ้นส่วน":         t.loadLanes?.lane_parts?.doneAt || "",
+        "QC หัว/เครื่องใน":      t.qcLanes?.lane_head?.doneAt || "",
+        "โหลด หัว/เครื่องใน":    t.loadLanes?.lane_head?.doneAt || "",
+        "QC หมูซีก":             t.qcLanes?.lane_pork?.doneAt || "",
+        "โหลด หมูซีก":           t.loadLanes?.lane_pork?.doneAt || "",
+        "ใบสรุป":                t.summaryPrintedAt || "",
+        "Invoice":               t.invoicedAt || "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, date);
+    XLSX.writeFile(wb, `Tracking_${date}.xlsx`);
+  };
 
   return (
     <div>
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>📊 Tracking การทำงาน</h2>
-          {[
-            { label: "รถทั้งหมด",  value: total,   color: "#3b82f6" },
-            { label: "Invoice",    value: doneInv, color: "#10b981" },
-            { label: "โหลดอยู่",  value: loading, color: "#f97316" },
-            { label: "รอเข้า",    value: waiting, color: "#8b5cf6" },
-          ].map(k => (
-            <div key={k.label} style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ fontSize: 20, fontWeight: 900, color: k.color }}>{k.value}</span>
-              <span style={{ fontSize: 11, color: "#6b7280" }}>{k.label}</span>
-            </div>
-          ))}
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 20 }}>📊 Tracking การทำงาน</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "7px 11px", fontSize: 13, fontWeight: 600, outline: "none" }} />
+          <button onClick={exportExcel}
+            style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            ⬇️ Export Excel
+          </button>
         </div>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)}
-          style={{ border: "1.5px solid #d1d5db", borderRadius: 0, padding: "7px 11px", fontSize: 13, fontWeight: 600, outline: "none" }} />
       </div>
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 40 }}>กำลังโหลด...</div>}
@@ -3235,16 +3248,6 @@ const WorkTracking = ({ trucks, queue }) => {
                           <span style={{ fontSize: 12, color: "#374151" }}>{val || "—"}</span>
                         </td>
                       );
-
-                      if (col.id === "status") {
-                        const s = STATUS_META[val];
-                        return (
-                          <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
-                            {s ? <span style={{ background: s.bg, color: s.color, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{s.label}</span>
-                               : <span style={{ color: "#d1d5db" }}>—</span>}
-                          </td>
-                        );
-                      }
 
                       if (col.id === "arrivedAt") {
                         const late = stdDiff != null && stdDiff > 0;
