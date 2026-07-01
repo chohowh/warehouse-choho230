@@ -3116,7 +3116,7 @@ const WorkTracking = ({ trucks, queue }) => {
     { id: "customerGroup",    grp: "info",   label: "กลุ่มลูกค้า", align: "left",   get: t => t.customerGroup || "—" },
     { id: "entrySTD",         grp: "entry",  label: "STD เข้า",   align: "center", get: t => getQ(t)?.entryTime },
     { id: "arrivedAt",        grp: "entry",  label: "ACT เข้า",   align: "center", get: t => t.arrivedAt },
-    { id: "entryDelta",       grp: "entry",  label: "ต่าง STD",   align: "center", get: t => {
+    { id: "entryDelta",       grp: "entry",  label: "เข้าเร็ว/ช้า",   align: "center", get: t => {
       const q = getQ(t);
       if (!q?.entryTime || !t.arrivedAt) return null;
       return workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime);
@@ -3285,8 +3285,10 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {stdDiff != null
-                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                  {late ? `+${stdDiff}′` : stdDiff < 0 ? `${stdDiff}′` : `0′`}
+                              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+                                  {late && <><span style={{ fontWeight: 700, color: "#dc2626" }}>{stdDiff}′</span><span style={{ color: "#dc2626" }}>ช้า</span></>}
+                                  {early && <><span style={{ fontWeight: 700, color: "#16a34a" }}>{Math.abs(stdDiff)}′</span><span style={{ color: "#16a34a" }}>เร็ว</span></>}
+                                  {!late && !early && <span style={{ color: "#1d4ed8", fontWeight: 700 }}>0′</span>}
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
