@@ -3285,10 +3285,8 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {stdDiff != null
-                              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                                  {late && <><span style={{ fontWeight: 700, color: "#dc2626" }}>{stdDiff}′</span><span style={{ color: "#dc2626" }}>ช้า</span></>}
-                                  {early && <><span style={{ fontWeight: 700, color: "#16a34a" }}>{Math.abs(stdDiff)}′</span><span style={{ color: "#16a34a" }}>เร็ว</span></>}
-                                  {!late && !early && <span style={{ color: "#1d4ed8", fontWeight: 700 }}>0′</span>}
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
+                                  {late ? `+${stdDiff}′` : early ? `${stdDiff}′` : `0′`}
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
