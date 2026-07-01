@@ -3292,10 +3292,10 @@ const WorkTracking = ({ trucks, queue }) => {
                             {stdDiff != null
                               ? <span>
                                   <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                    {late ? "+" : ""}
+                                    {late ? "-" : "+"}
                                   </span>
                                   <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                    {stdDiff} นาที
+                                    {Math.abs(stdDiff)} นาที
                                   </span>
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
@@ -3313,10 +3313,10 @@ const WorkTracking = ({ trucks, queue }) => {
                             {exitDiff != null
                               ? <span>
                                   <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                    {late ? "+" : ""}
+                                    {late ? "-" : "+"}
                                   </span>
                                   <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                    {exitDiff} นาที
+                                    {Math.abs(exitDiff)} นาที
                                   </span>
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
