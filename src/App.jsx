@@ -3290,8 +3290,8 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {stdDiff != null
-                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                  {late ? `+${stdDiff} นาที` : early ? `${stdDiff} นาที` : `0 นาที`}
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 16 }}>
+                                  {late ? "−" : early ? "+" : "="}
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
@@ -3306,8 +3306,8 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {exitDiff != null
-                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
-                                  {late ? `+${exitDiff} นาที` : early ? `${exitDiff} นาที` : `0 นาที`}
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 16 }}>
+                                  {late ? "−" : early ? "+" : "="}
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
