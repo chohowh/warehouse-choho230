@@ -3080,7 +3080,7 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
 // ─── WORK TRACKING (Power BI–style matrix table) ─────────────────────────────
 const WT_GROUPS = [
   { id: "info",  label: "",                       span: 2, dark: "#0f172a", mid: "#1e293b" },
-  { id: "entry", label: "เข้าโรงงาน / เบิกสินค้า", span: 3, dark: "#1d4ed8", mid: "#2563eb" },
+  { id: "entry", label: "เข้าโรงงาน / เบิกสินค้า", span: 4, dark: "#1d4ed8", mid: "#2563eb" },
   { id: "parts", label: "🥩 ลานชิ้นส่วน",         span: 3, dark: "#c2410c", mid: "#ea580c" },
   { id: "head",  label: "🐷 ลานหัว/เครื่องใน",     span: 3, dark: "#6d28d9", mid: "#7c3aed" },
   { id: "pork",  label: "🐖 ลานหมูซีก",            span: 3, dark: "#9f1239", mid: "#be123c" },
@@ -3116,6 +3116,11 @@ const WorkTracking = ({ trucks, queue }) => {
     { id: "customerGroup",    grp: "info",   label: "กลุ่มลูกค้า", align: "left",   get: t => t.customerGroup || "—" },
     { id: "entrySTD",         grp: "entry",  label: "STD เข้า",   align: "center", get: t => getQ(t)?.entryTime },
     { id: "arrivedAt",        grp: "entry",  label: "ACT เข้า",   align: "center", get: t => t.arrivedAt },
+    { id: "entryDelta",       grp: "entry",  label: "ต่าง STD",   align: "center", get: t => {
+      const q = getQ(t);
+      if (!q?.entryTime || !t.arrivedAt) return null;
+      return workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime);
+    } },
     { id: "pickingAt",        grp: "entry",  label: "พิมพ์ใบเบิก", align: "center", get: t => t.pickingAt },
     { id: "qc_parts",     grp: "parts", label: "ตรวจอุณหภูมิรถ", align: "center", get: t => t.qcLanes?.lane_parts?.doneAt },
     { id: "sample_parts", grp: "parts", label: "QC",              align: "center", get: t => t.sampleLanes?.lane_parts?.doneAt },
@@ -3141,12 +3146,16 @@ const WorkTracking = ({ trucks, queue }) => {
   const sortVal = (t, colId) => {
     const col = COLS.find(c => c.id === colId);
     const v = col?.get(t);
-    if (!v) return sortDir === 1 ? "zz" : "";
+    if (v == null || v === "") return sortDir === 1 ? "zz" : "";
+    if (colId === "entryDelta") {
+      const diff = Number(v);
+      return String(diff + 10000).padStart(5, "0");
+    }
     if (isTimeCol(colId) && colId !== "customerGroup") {
       const n = workTimeValue(v);
       return String(n).padStart(5, "0");
     }
-    return v;
+    return String(v);
   };
 
   const sorted = [...activeTrucks].sort((a, b) => {
@@ -3264,13 +3273,22 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {val
-                              ? <span>
-                                  <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>{val}</span>
-                                  {stdDiff != null && <span style={{ fontSize: 10, color: late ? "#dc2626" : "#16a34a", marginLeft: 3 }}>
-                                    {late ? `+${stdDiff}′` : stdDiff < 0 ? `${stdDiff}′` : ""}
-                                  </span>}
-                                </span>
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>{val}</span>
                               : <span style={{ color: "#d1d5db" }}>—</span>}
+                          </td>
+                        );
+                      }
+
+                      if (col.id === "entryDelta") {
+                        const late = stdDiff != null && stdDiff > 0;
+                        const early = stdDiff != null && stdDiff < 0;
+                        return (
+                          <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
+                            {stdDiff != null
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
+                                  {late ? `+${stdDiff}′` : stdDiff < 0 ? `${stdDiff}′` : `0′`}
+                                </span>
+                              : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
                         );
                       }
