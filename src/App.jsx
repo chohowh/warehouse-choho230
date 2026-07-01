@@ -3085,7 +3085,7 @@ const WT_GROUPS = [
   { id: "head",  label: "🐷 ลานหัว/เครื่องใน",     span: 3, dark: "#6d28d9", mid: "#7c3aed" },
   { id: "pork",  label: "🐖 ลานหมูซีก",            span: 3, dark: "#9f1239", mid: "#be123c" },
   { id: "docs",  label: "เอกสาร",                 span: 2, dark: "#0d9488", mid: "#0f766e" },
-  { id: "exit",  label: "ออกโรงงาน",              span: 1, dark: "#475569", mid: "#64748b" },
+  { id: "exit",  label: "ออกโรงงาน",              span: 2, dark: "#475569", mid: "#64748b" },
 ];
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
 const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", exit: "#f8fafc" };
@@ -3134,6 +3134,11 @@ const WorkTracking = ({ trucks, queue }) => {
     { id: "summaryPrintedAt", grp: "docs",   label: "ใบสรุป",         align: "center", get: t => t.summaryPrintedAt },
     { id: "invoicedAt",       grp: "docs",   label: "Invoice",         align: "center", get: t => t.invoicedAt },
     { id: "exitSTD",          grp: "exit",   label: "STD ออก",         align: "center", get: t => getQ(t)?.exitTime },
+    { id: "exitDelta",        grp: "exit",   label: "ออกเร็ว/ช้า",    align: "center", get: t => {
+      const q = getQ(t);
+      if (!q?.exitTime || !t.invoicedAt) return null;
+      return workTimeValue(t.invoicedAt) - workTimeValue(q.exitTime);
+    } },
   ];
 
   const isTimeCol = id => !["plate","customerGroup"].includes(id);
@@ -3147,7 +3152,7 @@ const WorkTracking = ({ trucks, queue }) => {
     const col = COLS.find(c => c.id === colId);
     const v = col?.get(t);
     if (v == null || v === "") return sortDir === 1 ? "zz" : "";
-    if (colId === "entryDelta") {
+    if (colId === "entryDelta" || colId === "exitDelta") {
       const diff = Number(v);
       return String(diff + 10000).padStart(5, "0");
     }
@@ -3287,6 +3292,22 @@ const WorkTracking = ({ trucks, queue }) => {
                             {stdDiff != null
                               ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
                                   {late ? `+${stdDiff}′` : early ? `${stdDiff}′` : `0′`}
+                                </span>
+                              : <span style={{ color: "#e5e7eb" }}>—</span>}
+                          </td>
+                        );
+                      }
+
+                      if (col.id === "exitDelta") {
+                        const q = getQ(t);
+                        const exitDiff = q?.exitTime && t.invoicedAt ? workTimeValue(t.invoicedAt) - workTimeValue(q.exitTime) : null;
+                        const late = exitDiff != null && exitDiff > 0;
+                        const early = exitDiff != null && exitDiff < 0;
+                        return (
+                          <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
+                            {exitDiff != null
+                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>
+                                  {late ? `+${exitDiff}′` : early ? `${exitDiff}′` : `0′`}
                                 </span>
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
