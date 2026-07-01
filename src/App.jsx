@@ -3278,7 +3278,7 @@ const WorkTracking = ({ trucks, queue }) => {
                         return (
                           <td key={col.id} style={{ padding: "7px 10px", background: cellBg, borderRight: "1px solid #e5e7eb", textAlign: "center", whiteSpace: "nowrap" }}>
                             {val
-                              ? <span style={{ fontWeight: 700, color: late ? "#dc2626" : early ? "#16a34a" : "#1d4ed8", fontSize: 13 }}>{val}</span>
+                              ? <span style={{ fontWeight: 700, color: "#2563eb", fontSize: 13 }}>{val}</span>
                               : <span style={{ color: "#d1d5db" }}>—</span>}
                           </td>
                         );
