@@ -67,11 +67,13 @@ const DATE_STR = () => {
 };
 const safePlate = p => String(p).replace(/[^a-zA-Z0-9]/g, "") || "unknown";
 
-const compressImage = file => new Promise(resolve => {
+const compressImage = file => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.readAsDataURL(file);
+  reader.onerror = () => reject(new Error(`อ่านไฟล์รูปไม่สำเร็จ: ${file.name || ""}`));
   reader.onload = ev => {
     const img = new Image();
+    img.onerror = () => reject(new Error(`ไฟล์รูปเสียหายหรือไม่รองรับ: ${file.name || ""}`));
     img.src = ev.target.result;
     img.onload = () => {
       const canvas = document.createElement("canvas");
@@ -1697,7 +1699,7 @@ const QC = ({ trucks, onUpdate, laneId }) => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
         return [...p, ...newPhotos].slice(0, 15);
       });
-    });
+    }).catch(err => alert(err.message));
   };
 
   const handleSubmit = async () => {
@@ -1706,7 +1708,7 @@ const QC = ({ trucks, onUpdate, laneId }) => {
     try {
       const photoUrls = await uploadPhotos(`qc`, sel.plate, Array.isArray(photo) ? photo : (photo ? [photo] : []));
       const qcLanes = { ...(sel.qcLanes || {}), [lane]: { done: true, temp, photos: photoUrls, doneAt: TIME_NOW() } };
-      onUpdate(sel.id, { qcLanes });
+      await onUpdate(sel.id, { qcLanes });
       setFlashLane(lane); setTemp(""); setPhoto(null);
       setTimeout(() => setFlashLane(null), 2500);
     } catch (e) {
@@ -1806,7 +1808,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
         return [...p, ...newPhotos].slice(0, 15);
       });
-    });
+    }).catch(err => alert(err.message));
   };
 
   const handleSubmit = async () => {
@@ -1815,7 +1817,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
     try {
       const photoUrls = await uploadPhotos(`sample`, sel.plate, photos);
       const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW() } };
-      onUpdate(sel.id, { sampleLanes });
+      await onUpdate(sel.id, { sampleLanes });
       setFlashLane(lane); setPhoto(null); setNote("");
       setTimeout(() => setFlashLane(null), 2500);
     } catch (e) {
@@ -1925,19 +1927,25 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
         const curPhotos = Array.isArray(f.photo) ? f.photo : (f.photo ? [f.photo] : []);
         return { ...prev, [lId]: { ...f, photo: [...curPhotos, ...newPhotos].slice(0, 15) } };
       });
-    });
+    }).catch(err => alert(err.message));
   };
 
-  const handleWaiting = () => {
-    if (!sel) return;
+  const handleWaiting = async () => {
+    if (!sel || form.uploading) return;
     if (!window.confirm(`ยืนยัน: ${sel.plate} — รอเติมสินค้า?`)) return;
-    const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), note: form.note } };
-    onUpdate(sel.id, { loadLanes });
-    setF(activeLane, { selId: "", photo: null, note: "" });
+    setF(activeLane, { uploading: true });
+    try {
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), note: form.note } };
+      await onUpdate(sel.id, { loadLanes });
+      setF(activeLane, { selId: "", photo: null, note: "", uploading: false });
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+      setF(activeLane, { uploading: false });
+    }
   };
 
   const handleLoad = async () => {
-    if (!sel) return;
+    if (!sel || form.uploading) return;
     if (!window.confirm(`ยืนยัน: บันทึกโหลดเสร็จ ${sel.plate}?`)) return;
     setF(activeLane, { uploading: true });
     try {
@@ -1945,11 +1953,11 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
       const photoUrls = await uploadPhotos(`loading/${activeLane}`, sel.plate, photos);
       const existing = sel.loadLanes?.[activeLane] || {};
       const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW() } };
-      onUpdate(sel.id, { loadLanes });
+      await onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false });
       setTimeout(() => setF(activeLane, { flash: false }), 2500);
     } catch (e) {
-      alert("อัพโหลดรูปไม่สำเร็จ: " + e.message);
+      alert("บันทึกไม่สำเร็จ: " + e.message);
       setF(activeLane, { uploading: false });
     }
   };
@@ -3546,7 +3554,8 @@ export default function App() {
     }
 
     const updated = { ...truck, ...upd };
-    await supabase.from("wh_trucks").upsert({ id, data: updated });
+    const { error } = await supabase.from("wh_trucks").upsert({ id, data: updated });
+    if (error) throw error;
     setTrucks(prev => prev.map(t => t.id === id ? updated : t));
   };
 
