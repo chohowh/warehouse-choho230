@@ -1449,7 +1449,7 @@ const DriverScan = ({ queue, trucks, onScan, skipGeofence }) => {
 };
 
 // ── 3+6. PICKING ──────────────────────────────────────────────────────────────
-const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
+const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
   const isMobile = useIsMobile();
 
   // รวม queue + walk-in (รถที่เข้าแล้วแต่ยังไม่มีในคิว)
@@ -1522,12 +1522,6 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
         + เพิ่มสถานะ
       </button>
     );
-  };
-
-  const laneMatch = plate => {
-    const num = plateNum(plate);
-    const matched = num ? Object.entries(detailMap).find(([k]) => plateNum(k) === num) : null;
-    return matched ? matched[1] : new Set();
   };
 
   const StatusCell = ({ truck, compact }) => {
@@ -1615,7 +1609,7 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
               </thead>
               <tbody>
                 {filteredRows.map(({ key, plate, customerGroup, entryTime, truck }) => {
-                  const lanes = laneMatch(plate);
+                  const lanes = laneMatchForTruck({ plate, customerGroup }, detailMapByChannel);
                   return isMobile ? (
                     <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
                       <td style={{ padding: "8px 6px", fontWeight: 800 }}>
@@ -1678,7 +1672,7 @@ const Picking = ({ trucks, queue, onUpdate, detailMap = {} }) => {
 };
 
 // ── 4. QC (per-lane) ──────────────────────────────────────────────────────────
-const QC = ({ trucks, onUpdate, laneId }) => {
+const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
   const [selId,     setSelId]     = useState("");
   const lane = laneId;
   const [temp,      setTemp]      = useState("");
@@ -1732,7 +1726,17 @@ const QC = ({ trucks, onUpdate, laneId }) => {
       {/* เลือกรถ */}
       <div style={{ background: "#fff", borderRadius: 0, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>เลือกทะเบียนรถ</label>
-        <select value={selId} onChange={e => { setSelId(e.target.value); setTemp(""); setPhoto(null); }}
+        <select value={selId} onChange={e => {
+            const id = e.target.value;
+            setSelId(id); setTemp(""); setPhoto(null);
+            const t = trucks.find(tt => tt.id === id);
+            if (t) {
+              const lanes = laneMatchForTruck(t, detailMapByChannel);
+              if (lanes.size > 0 && !lanes.has(lane)) {
+                alert(`ทะเบียนนี้ไม่มีโหลดสินค้า ${actLane.label}`);
+              }
+            }
+          }}
           style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}>
           <option value="">-- เลือกทะเบียนรถที่รอเข้าโหลด --</option>
           {eligible.map(t => <option key={t.id} value={t.id}>{t.loadLanes?.[lane]?.waiting ? "⏳ " : ""}{t.plate} · {t.customerGroup || t.product}</option>)}
@@ -1787,7 +1791,7 @@ const QC = ({ trucks, onUpdate, laneId }) => {
 };
 
 // ── 4b. RANDOM SAMPLE CHECK (per-lane, photo only, no temp) ───────────────────
-const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
+const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
   const [selId,     setSelId]     = useState("");
   const lane = laneId;
   const [photo,     setPhoto]     = useState(null);
@@ -1839,7 +1843,17 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId }) => {
       {/* เลือกรถ */}
       <div style={{ background: "#fff", borderRadius: 0, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>เลือกทะเบียนรถ</label>
-        <select value={selId} onChange={e => { setSelId(e.target.value); setPhoto(null); setNote(""); }}
+        <select value={selId} onChange={e => {
+            const id = e.target.value;
+            setSelId(id); setPhoto(null); setNote("");
+            const t = trucks.find(tt => tt.id === id);
+            if (t) {
+              const lanes = laneMatchForTruck(t, detailMapByChannel);
+              if (lanes.size > 0 && !lanes.has(lane)) {
+                alert(`ทะเบียนนี้ไม่มีโหลดสินค้า ${actLane.label}`);
+              }
+            }
+          }}
           style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}>
           <option value="">-- เลือกทะเบียนรถ --</option>
           {eligible.map(t => <option key={t.id} value={t.id}>{t.plate} · {t.customerGroup || t.product}</option>)}
@@ -2769,6 +2783,59 @@ const normalizeLaneKey = (raw) => {
 };
 const normalizeProductCode = (val) => String(val || "").replace(/\.0+$/, "").trim().replace(/^0+(\d)/, "$1");
 
+// joins order rows (plate, productCode) against the master lane list → plate→Set(laneKey)
+const buildDetailMap = (masterLane, allDetailRows) => {
+  const map = {};
+  for (const row of allDetailRows) {
+    const rowCode = normalizeProductCode(row.productCode);
+    const match = masterLane.find(m => normalizeProductCode(m.productCode) === rowCode);
+    if (!match) continue;
+    const k = String(row.plate).replace(/\s/g, "").toUpperCase();
+    if (!map[k]) map[k] = new Set();
+    map[k].add(match.laneKey);
+  }
+  return map;
+};
+
+// one detailMap per PO channel, so a plate's lanes never leak across channels
+const buildDetailMapByChannel = (masterLane, rowsByChannel) => {
+  const result = {};
+  for (const src of DETAIL_SOURCES) result[src.id] = buildDetailMap(masterLane, rowsByChannel[src.id] || []);
+  return result;
+};
+
+// LG's "กลุ่มลูกค้า" is a comma-separated list of sub-brand tags, e.g.
+// "MT-Lotus-CPFM,MT-LotusB2C,Wetmarket" — split & classify each token to a PO channel.
+// Unrecognized tags (CPFTH, FARM, ...) are simply ignored, not one of the 3 channels.
+const normalizeChannels = (customerGroup) => {
+  const channels = new Set();
+  for (const raw of String(customerGroup || "").split(",")) {
+    const t = raw.trim().toLowerCase();
+    if (!t) continue;
+    if (t.includes("makro")) channels.add("modern_trade");
+    else if (t.includes("lotus")) channels.add("others");
+    else if (t.includes("wetmarket") || t.includes("wet market")) channels.add("wet_market");
+  }
+  return channels;
+};
+
+// lanes a specific truck round needs, scoped to only the PO channel(s) its LG
+// "กลุ่มลูกค้า" says it's running — a plate that does 2 rounds for 2 different
+// customers in one day must not have both rounds' lanes merged together
+const laneMatchForTruck = (truck, detailMapByChannel) => {
+  const channels = normalizeChannels(truck?.customerGroup);
+  if (!channels.size) return new Set();
+  const num = (String(truck?.plate).match(/\d+/g) || []).pop() || "";
+  if (!num) return new Set();
+  const lanes = new Set();
+  for (const ch of channels) {
+    const map = detailMapByChannel[ch] || {};
+    const matched = Object.entries(map).find(([k]) => (String(k).match(/\d+/g) || []).pop() === num);
+    if (matched) matched[1].forEach(l => lanes.add(l));
+  }
+  return lanes;
+};
+
 const DETAIL_LS_VER = "v2"; // bump when encoding/format changes — forces re-upload
 
 const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
@@ -2825,8 +2892,11 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
     const channel = supabase.channel("detail-src-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "wh_master" }, async (payload) => {
         const row = payload.new;
-        if (!row?.id?.startsWith("detail_")) return;
-        const srcId = row.id.replace(/^detail_/, "");
+        if (!row?.id) return;
+        const today = cycleDateStr();
+        const src = DETAIL_SOURCES.find(s => `detail_${s.id}_${today}` === row.id);
+        if (!src) return;
+        const srcId = src.id;
         // Re-fetch แทนการอ่านจาก payload เพราะ JSONB ขนาดใหญ่อาจถูกตัดใน realtime
         const { data: fresh } = await supabase.from("wh_master").select("data").eq("id", row.id).single();
         const payload2 = fresh?.data || row.data || {};
@@ -2891,7 +2961,7 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
       }
 
       try {
-        const { error } = await supabase.from("wh_master").upsert({ id: `detail_${srcId}`, data: { rows: parsed, file_name: file.name } });
+        const { error } = await supabase.from("wh_master").upsert({ id: `detail_${srcId}_${cycleDateStr()}`, data: { rows: parsed, file_name: file.name } });
         if (error) throw error;
       } catch (e) {
         alert("บันทึกขึ้นเซิร์ฟเวอร์ไม่สำเร็จ — เครื่องอื่นจะไม่เห็นข้อมูลนี้: " + e.message);
@@ -3098,13 +3168,27 @@ const WT_GROUPS = [
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
 const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", exit: "#f8fafc" };
 
-const WorkTracking = ({ trucks, queue }) => {
+const GRP_LANE = { parts: "lane_parts", head: "lane_head", pork: "lane_pork" };
+
+const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] }) => {
   const today = cycleDateStr();
   const [date, setDate]       = useState(today);
   const [archiveData, setArchiveData] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
+  const [histDetailMapByChannel, setHistDetailMapByChannel] = useState(null); // for a past date being viewed
   const [sortCol, setSortCol] = useState("arrivedAt");
   const [sortDir, setSortDir] = useState(1);
+
+  // วันปัจจุบัน → ใช้ detailMap สด, วันย้อนหลัง → ดึงไฟล์ PO ของวันนั้นมาคำนวณใหม่
+  // (Master ลานโหลดไม่ได้เก็บย้อนหลัง จึงใช้ตัวปัจจุบันร่วมกับไฟล์ PO ของวันที่ดู)
+  const effectiveDetailMapByChannel = date === today ? detailMapByChannel : (histDetailMapByChannel || {});
+
+  // lane groups the truck's PO data says it does NOT need — cell gets blacked out
+  const irrelevantGrps = t => {
+    const lanes = laneMatchForTruck(t, effectiveDetailMapByChannel);
+    if (!lanes.size) return new Set();
+    return new Set(Object.keys(GRP_LANE).filter(g => !lanes.has(GRP_LANE[g])));
+  };
 
   useEffect(() => {
     setArchiveData(null);
@@ -3113,6 +3197,18 @@ const WorkTracking = ({ trucks, queue }) => {
       .then(({ data }) => setArchiveData(data ?? null))
       .finally(() => setLoadingArchive(false));
   }, [date, today]);
+
+  useEffect(() => {
+    if (date === today) { setHistDetailMapByChannel(null); return; }
+    let cancelled = false;
+    fetchDetailSrc(date).then(remote => {
+      if (cancelled) return;
+      const rowsByChannel = {};
+      for (const src of DETAIL_SOURCES) rowsByChannel[src.id] = remote?.[src.id]?.rows || [];
+      setHistDetailMapByChannel(buildDetailMapByChannel(masterLane, rowsByChannel));
+    });
+    return () => { cancelled = true; };
+  }, [date, today, masterLane]);
 
   const activeTrucks = archiveData?.trucks ?? (date === today ? trucks : []);
   const activeQueue  = archiveData?.queue  ?? (date === today ? queue  : []);
@@ -3332,6 +3428,11 @@ const WorkTracking = ({ trucks, queue }) => {
                         );
                       }
 
+                      // ลานที่ไม่เกี่ยวข้องกับทะเบียนนี้ (ตามข้อมูล PO ที่อัพโหลด) — ถมดำ
+                      if (GRP_LANE[col.grp] && irrelevantGrps(t).has(col.grp)) {
+                        return <td key={col.id} style={{ padding: "7px 10px", background: "#000", borderRight: "1px solid #e5e7eb" }} />;
+                      }
+
                       // Generic time cell
                       const g = WT_GROUP_MAP[col.grp];
                       return (
@@ -3443,15 +3544,16 @@ const LaneSelect = ({ tabs, roleLabel, onSelect, onBack }) => (
 const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue").select("*");  return (data || []).map(r => r.data).sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity)); };
 const fetchTrucks = async () => { const { data } = await supabase.from("wh_trucks").select("*"); return (data || []).map(r => r.data); };
 const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "master"); return data && data[0] ? (data[0].data || []) : []; };
-const fetchDetailSrc = async () => {
-  const ids = DETAIL_SOURCES.map(s => `detail_${s.id}`);
+const fetchDetailSrc = async (date = cycleDateStr()) => {
+  const ids = DETAIL_SOURCES.map(s => `detail_${s.id}_${date}`);
   const { data } = await supabase.from("wh_master").select("*").in("id", ids);
   if (!data || data.length === 0) return null;
   const result = {};
   for (const row of data) {
-    const srcId = row.id.replace(/^detail_/, "");
+    const src = DETAIL_SOURCES.find(s => `detail_${s.id}_${date}` === row.id);
+    if (!src) continue;
     const payload = row.data || {};
-    result[srcId] = {
+    result[src.id] = {
       rows:     Array.isArray(payload) ? payload : (payload.rows || []),
       fileName: payload.file_name || "",
     };
@@ -3478,7 +3580,7 @@ export default function App() {
   const [masterLane, setMasterLane] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wh_master_cache") || "[]"); } catch { return []; }
   });
-  const [detailMap,  setDetailMap]  = useState({}); // plate→Set(lanes) computed
+  const [detailMapByChannel, setDetailMapByChannel] = useState({}); // { channelId: plate→Set(lanes) }
   const [srcVersion, setSrcVersion] = useState(0);  // bumped when source files change
   const [tab,        setTab]        = useState("dashboard");
   const [dashLane,   setDashLane]   = useState("main");
@@ -3520,22 +3622,12 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Recompute detailMap whenever masterLane or source files change
+  // Recompute detailMapByChannel whenever masterLane or source files change
   useEffect(() => {
     if (!masterLane.length) return;
     try {
       const stored = JSON.parse(localStorage.getItem("wh_detail_src") || "{}");
-      const allDetail = Object.values(stored).flat();
-      const map = {};
-      for (const row of allDetail) {
-        const rowCode = normalizeProductCode(row.productCode);
-        const match = masterLane.find(m => normalizeProductCode(m.productCode) === rowCode);
-        if (!match) continue;
-        const k = String(row.plate).replace(/\s/g, "").toUpperCase();
-        if (!map[k]) map[k] = new Set();
-        map[k].add(match.laneKey);
-      }
-      setDetailMap(map);
+      setDetailMapByChannel(buildDetailMapByChannel(masterLane, stored));
     } catch {}
   }, [masterLane, srcVersion]);
 
@@ -3721,7 +3813,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🌡️" title="ลานโหลด ชิ้นส่วน" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3732,7 +3824,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🌡️" title="ลานโหลด หัว/เครื่องใน" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3743,7 +3835,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🌡️" title="ลานโหลด หมูซีก" color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
+          <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3789,7 +3881,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="📷" title="QC ชิ้นส่วน" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3800,7 +3892,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="📷" title="QC หัว/เครื่องใน" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3811,7 +3903,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="📷" title="QC หมูซีก" color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
+          <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />
         </div>
       </div>
     );
@@ -3859,22 +3951,22 @@ export default function App() {
         {!isNarrow && <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
       </div>
       <div style={{ maxWidth: tab === "dashboard" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
-        {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMap} />}
+        {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} />}
         {tab === "qr"        && <QRCodePage />}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
-        {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMap={detailMap} />}
-        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
-        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
-        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
+        {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMapByChannel={detailMapByChannel} />}
+        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
+        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
+        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
         {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
         {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
         {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
-        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
-        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
-        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
+        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
+        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
+        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
-        {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} />}
+        {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} detailMapByChannel={detailMapByChannel} masterLane={masterLane} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
         {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
