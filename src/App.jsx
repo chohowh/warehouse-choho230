@@ -321,6 +321,9 @@ const Icon = ({ name, size = 20 }) => {
     invoice:   <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>,
     temp:      <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>,
     loader:    <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+    clock:     <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>,
+    exit:      <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>,
+    alert:     <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
     x:         <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>,
     bell:      <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>,
     plan:      <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
@@ -3170,11 +3173,148 @@ const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head:
 
 const GRP_LANE = { parts: "lane_parts", head: "lane_head", pork: "lane_pork" };
 
+// ─── STAT TILE (Tracking summary cards) ──────────────────────────────────────
+// de-emphasis bars in a light tint of the tile's own accent hue, current (last) bar in full accent
+const Sparkline = ({ data, accent, height = 30, barWidth = 5, gap = 3 }) => {
+  if (!data || !data.length) return null;
+  const max = Math.max(1, ...data);
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap, height, flexShrink: 0 }}>
+      {data.map((v, i) => {
+        const h = Math.max(2, Math.round((v / max) * height));
+        const isLast = i === data.length - 1;
+        return <div key={i} style={{ width: barWidth, height: h, borderRadius: "3px 3px 0 0", background: isLast ? accent : `${accent}2E` }} />;
+      })}
+    </div>
+  );
+};
+
+const DeltaPill = ({ delta, goodDirection = "up", suffix = "" }) => {
+  if (delta == null) return null;
+  const isGood = delta === 0 ? null : goodDirection === "up" ? delta > 0 : delta < 0;
+  const bg = isGood == null ? "#f1f0ec" : isGood ? "#e6f6e6" : "#fceaea";
+  const fg = isGood == null ? "#6b7280" : isGood ? "#0ca30c" : "#d03b3b";
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+  return (
+    <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 800, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>
+      {sign}{Math.abs(delta)}{suffix}
+    </span>
+  );
+};
+
+const StatTile = ({ icon, accent, title, value, unit, delta, deltaGood, deltaSuffix, sparkline }) => (
+  <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon name={icon} size={15} />
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#52514e", lineHeight: 1.25 }}>{title}</div>
+    </div>
+
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
+        {value}{unit ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 3 }}>{unit}</span> : null}
+      </div>
+      <Sparkline data={sparkline} accent={accent} />
+    </div>
+
+    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <DeltaPill delta={delta} goodDirection={deltaGood} suffix={deltaSuffix} />
+      <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>เทียบเมื่อวาน</span>
+    </div>
+  </div>
+);
+
+// combined tile for exit on-time % + late count — two figures, one "รถออก" story
+const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeDelta, lateCount, latePct, lateDelta, sparkline }) => (
+  <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon name={icon} size={15} />
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#52514e", lineHeight: 1.25 }}>{title}</div>
+    </div>
+
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
+            {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
+          </div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา</div>
+        </div>
+        <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#e34948", lineHeight: 1, whiteSpace: "nowrap" }}>
+            {lateCount}<span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>คัน</span>
+          </div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>สาย{latePct != null ? ` (${latePct}%)` : ""}</div>
+        </div>
+      </div>
+      <Sparkline data={sparkline} accent={accent} />
+    </div>
+
+    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <DeltaPill delta={onTimeDelta} goodDirection="up" suffix="pp" />
+        <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>ตรงเวลา</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <DeltaPill delta={lateDelta} goodDirection="down" />
+        <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>สาย</span>
+      </div>
+    </div>
+  </div>
+);
+
+// combined tile for total entered count + on-time % — one "รถเข้า" story
+const EntryStatTile = ({ icon, accent, title, count, countDelta, onTimePct, onTimeDelta, sparkline }) => (
+  <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon name={icon} size={15} />
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#52514e", lineHeight: 1.25 }}>{title}</div>
+    </div>
+
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
+            {count}<span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>คัน</span>
+          </div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>เข้าโรงงาน</div>
+        </div>
+        <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: "#1baf7a", lineHeight: 1, whiteSpace: "nowrap" }}>
+            {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
+          </div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา</div>
+        </div>
+      </div>
+      <Sparkline data={sparkline} accent={accent} />
+    </div>
+
+    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <DeltaPill delta={countDelta} goodDirection="up" />
+        <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>เข้าโรงงาน</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <DeltaPill delta={onTimeDelta} goodDirection="up" suffix="pp" />
+        <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>ตรงเวลา</span>
+      </div>
+    </div>
+  </div>
+);
+
 const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] }) => {
   const today = cycleDateStr();
   const [date, setDate]       = useState(today);
   const [archiveData, setArchiveData] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
+  const [prevArchiveData, setPrevArchiveData] = useState(null);
   const [histDetailMapByChannel, setHistDetailMapByChannel] = useState(null); // for a past date being viewed
   const [sortCol, setSortCol] = useState("arrivedAt");
   const [sortDir, setSortDir] = useState(1);
@@ -3197,6 +3337,18 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
       .then(({ data }) => setArchiveData(data ?? null))
       .finally(() => setLoadingArchive(false));
   }, [date, today]);
+
+  // ก่อนหน้า 1 วัน — ใช้เทียบ delta ใน summary card เท่านั้น
+  useEffect(() => {
+    setPrevArchiveData(null);
+    const d = new Date(date);
+    d.setDate(d.getDate() - 1);
+    const prevDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    let cancelled = false;
+    supabase.from("wh_archive").select("trucks, queue").eq("archive_date", prevDate).single()
+      .then(({ data }) => { if (!cancelled) setPrevArchiveData(data ?? null); });
+    return () => { cancelled = true; };
+  }, [date]);
 
   useEffect(() => {
     if (date === today) { setHistDetailMapByChannel(null); return; }
@@ -3305,6 +3457,86 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
     XLSX.writeFile(wb, `Tracking_${date}.xlsx`);
   };
 
+  // ── สรุปสถิติ: รถเข้า/ออกตรงเวลา, เวลาเฉลี่ยอยู่ในโรงงาน ──
+  // ตัวช่วยทั่วไป — ใช้คำนวณได้ทั้งวันที่กำลังดู และวันก่อนหน้า (สำหรับ delta)
+  const computeStats = (trucksArr, queueArr) => {
+    const gq = t => queueArr.find(q => q.id === t.queueId) || queueArr.find(q => pNum(q.plate) === pNum(t.plate) && pNum(q.plate) !== "");
+    const entered = trucksArr.filter(t => t.arrivedAt);
+    const entryDiffs = entered
+      .map(t => { const q = gq(t); return q?.entryTime ? workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime) : null; })
+      .filter(d => d != null);
+    const enteredOnTime = entryDiffs.filter(d => d <= 0).length;
+
+    const exited = trucksArr.filter(t => t.invoicedAt);
+    const exitDiffs = exited
+      .map(t => { const q = gq(t); return q?.exitTime ? workTimeValue(t.invoicedAt) - workTimeValue(q.exitTime) : null; })
+      .filter(d => d != null);
+    const exitedOnTime = exitDiffs.filter(d => d <= 0).length;
+    const exitedLate = exitDiffs.filter(d => d > 0).length;
+
+    const stays = trucksArr
+      .filter(t => t.arrivedAt && t.invoicedAt)
+      .map(t => workTimeValue(t.invoicedAt) - workTimeValue(t.arrivedAt))
+      .filter(d => d >= 0);
+    const avgStay = stays.length ? Math.round(stays.reduce((a, b) => a + b, 0) / stays.length) : null;
+
+    return {
+      enteredCount: entered.length,
+      enteredOnTimePct: entryDiffs.length ? Math.round(enteredOnTime / entryDiffs.length * 100) : null,
+      avgStay,
+      exitedOnTimePct: exitDiffs.length ? Math.round(exitedOnTime / exitDiffs.length * 100) : null,
+      exitedLateCount: exitedLate,
+      exitedLatePct: exitDiffs.length ? Math.round(exitedLate / exitDiffs.length * 100) : null,
+    };
+  };
+
+  // แบ่งวันทำงาน (24 ชม. นับจากเวลาตัดรอบ) เป็น 8 ช่วง ๆ ละ 3 ชม. สำหรับ mini bar chart
+  const bucketize = (items, timeFn, valueFn = null, buckets = 8) => {
+    const startMin = WORK_DAY_CUTOFF_HOUR * 60;
+    const bucketMin = (24 * 60) / buckets;
+    const sums = Array(buckets).fill(0);
+    const counts = Array(buckets).fill(0);
+    for (const it of items) {
+      const time = timeFn(it);
+      if (!time) continue;
+      const idx = Math.min(buckets - 1, Math.max(0, Math.floor((workTimeValue(time) - startMin) / bucketMin)));
+      counts[idx]++;
+      sums[idx] += valueFn ? valueFn(it) : 1;
+    }
+    return valueFn ? sums.map((s, i) => (counts[i] ? Math.round(s / counts[i]) : 0)) : sums;
+  };
+
+  const cur = computeStats(activeTrucks, activeQueue);
+  const prevTrucks = prevArchiveData?.trucks ?? [];
+  const prevQueue  = prevArchiveData?.queue  ?? [];
+  const prev = computeStats(prevTrucks, prevQueue);
+  const delta = (a, b) => (a == null || b == null ? null : a - b);
+
+  const avgStayLabel = cur.avgStay != null ? `${Math.floor(cur.avgStay / 60)} ชม ${cur.avgStay % 60} นาที` : "—";
+
+  const staysWithEntry = activeTrucks.filter(t => t.arrivedAt && t.invoicedAt);
+
+  const statCards = [
+    {
+      type: "entry", icon: "truck", accent: "#2a78d6", title: "รถเข้าโรงงาน (รวม / ตรงเวลา)",
+      count: cur.enteredCount, countDelta: delta(cur.enteredCount, prev.enteredCount),
+      onTimePct: cur.enteredOnTimePct, onTimeDelta: delta(cur.enteredOnTimePct, prev.enteredOnTimePct),
+      sparkline: bucketize(activeTrucks.filter(t => t.arrivedAt), t => t.arrivedAt),
+    },
+    {
+      icon: "clock", accent: "#eda100", title: "เวลาเฉลี่ยอยู่ในโรงงาน",
+      value: avgStayLabel, unit: "",
+      delta: delta(cur.avgStay, prev.avgStay), deltaGood: "down", deltaSuffix: " นาที",
+      sparkline: bucketize(staysWithEntry, t => t.arrivedAt, t => workTimeValue(t.invoicedAt) - workTimeValue(t.arrivedAt)),
+    },
+    {
+      type: "exit", icon: "exit", accent: "#4a3aa7", title: "รถออก (ตรงเวลา / สาย)",
+      onTimePct: cur.exitedOnTimePct, onTimeDelta: delta(cur.exitedOnTimePct, prev.exitedOnTimePct),
+      lateCount: cur.exitedLateCount, latePct: cur.exitedLatePct, lateDelta: delta(cur.exitedLateCount, prev.exitedLateCount),
+      sparkline: bucketize(activeTrucks.filter(t => t.invoicedAt), t => t.invoicedAt),
+    },
+  ];
+
   return (
     <div>
       {/* Top bar */}
@@ -3319,6 +3551,28 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
           </button>
         </div>
       </div>
+
+      {/* Summary stat cards */}
+      {!loadingArchive && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 16 }}>
+          {statCards.map(c => {
+            if (c.type === "entry") return (
+              <EntryStatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title}
+                count={c.count} countDelta={c.countDelta} onTimePct={c.onTimePct} onTimeDelta={c.onTimeDelta}
+                sparkline={c.sparkline} />
+            );
+            if (c.type === "exit") return (
+              <ExitStatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title}
+                onTimePct={c.onTimePct} onTimeDelta={c.onTimeDelta} lateCount={c.lateCount} latePct={c.latePct} lateDelta={c.lateDelta}
+                sparkline={c.sparkline} />
+            );
+            return (
+              <StatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title} value={c.value} unit={c.unit}
+                delta={c.delta} deltaGood={c.deltaGood} deltaSuffix={c.deltaSuffix} sparkline={c.sparkline} />
+            );
+          })}
+        </div>
+      )}
 
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 40 }}>กำลังโหลด...</div>}
 
