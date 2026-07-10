@@ -3189,20 +3189,24 @@ const Sparkline = ({ data, accent, height = 30, barWidth = 5, gap = 3 }) => {
   );
 };
 
-const DeltaPill = ({ delta, goodDirection = "up", suffix = "" }) => {
+const DeltaPill = ({ delta, goodDirection = "up", suffix = "", formatAbs }) => {
   if (delta == null) return null;
   const isGood = delta === 0 ? null : goodDirection === "up" ? delta > 0 : delta < 0;
   const bg = isGood == null ? "#f1f0ec" : isGood ? "#e6f6e6" : "#fceaea";
   const fg = isGood == null ? "#6b7280" : isGood ? "#0ca30c" : "#d03b3b";
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+  const abs = Math.abs(delta);
   return (
     <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 800, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>
-      {sign}{Math.abs(delta)}{suffix}
+      {sign}{formatAbs ? formatAbs(abs) : `${abs}${suffix}`}
     </span>
   );
 };
 
-const StatTile = ({ icon, accent, title, value, unit, delta, deltaGood, deltaSuffix, sparkline }) => (
+// e.g. 68 → "1 ชม. 8 น.", 45 → "45 น."
+const formatMinsDelta = (mins) => (mins < 60 ? `${mins} น.` : `${Math.floor(mins / 60)} ชม. ${mins % 60} น.`);
+
+const StatTile = ({ icon, accent, title, value, unit, delta, deltaGood, deltaSuffix, deltaFormatAbs, sparkline }) => (
   <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -3219,14 +3223,14 @@ const StatTile = ({ icon, accent, title, value, unit, delta, deltaGood, deltaSuf
     </div>
 
     <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-      <DeltaPill delta={delta} goodDirection={deltaGood} suffix={deltaSuffix} />
+      <DeltaPill delta={delta} goodDirection={deltaGood} suffix={deltaSuffix} formatAbs={deltaFormatAbs} />
       <span style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, whiteSpace: "nowrap" }}>เทียบเมื่อวาน</span>
     </div>
   </div>
 );
 
 // combined tile for exit on-time % + late count — two figures, one "รถออก" story
-const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeDelta, lateCount, latePct, lateDelta, sparkline }) => (
+const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, onTimeDelta, lateCount, latePct, lateDelta, sparkline }) => (
   <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -3241,7 +3245,7 @@ const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeDelta, lateCount, 
           <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
             {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา</div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
         </div>
         <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
         <div>
@@ -3268,7 +3272,7 @@ const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeDelta, lateCount, 
 );
 
 // combined tile for total entered count + on-time % — one "รถเข้า" story
-const EntryStatTile = ({ icon, accent, title, count, countDelta, onTimePct, onTimeDelta, sparkline }) => (
+const EntryStatTile = ({ icon, accent, title, count, countDelta, onTimePct, onTimeCount, onTimeDelta, sparkline }) => (
   <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -3290,7 +3294,7 @@ const EntryStatTile = ({ icon, accent, title, count, countDelta, onTimePct, onTi
           <div style={{ fontSize: 26, fontWeight: 900, color: "#1baf7a", lineHeight: 1, whiteSpace: "nowrap" }}>
             {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา</div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
         </div>
       </div>
       <Sparkline data={sparkline} accent={accent} />
@@ -3482,8 +3486,10 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
 
     return {
       enteredCount: entered.length,
+      enteredOnTimeCount: enteredOnTime,
       enteredOnTimePct: entryDiffs.length ? Math.round(enteredOnTime / entryDiffs.length * 100) : null,
       avgStay,
+      exitedOnTimeCount: exitedOnTime,
       exitedOnTimePct: exitDiffs.length ? Math.round(exitedOnTime / exitDiffs.length * 100) : null,
       exitedLateCount: exitedLate,
       exitedLatePct: exitDiffs.length ? Math.round(exitedLate / exitDiffs.length * 100) : null,
@@ -3520,18 +3526,18 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
     {
       type: "entry", icon: "truck", accent: "#2a78d6", title: "รถเข้าโรงงาน (รวม / ตรงเวลา)",
       count: cur.enteredCount, countDelta: delta(cur.enteredCount, prev.enteredCount),
-      onTimePct: cur.enteredOnTimePct, onTimeDelta: delta(cur.enteredOnTimePct, prev.enteredOnTimePct),
+      onTimePct: cur.enteredOnTimePct, onTimeCount: cur.enteredOnTimeCount, onTimeDelta: delta(cur.enteredOnTimePct, prev.enteredOnTimePct),
       sparkline: bucketize(activeTrucks.filter(t => t.arrivedAt), t => t.arrivedAt),
     },
     {
       icon: "clock", accent: "#eda100", title: "เวลาเฉลี่ยอยู่ในโรงงาน",
       value: avgStayLabel, unit: "",
-      delta: delta(cur.avgStay, prev.avgStay), deltaGood: "down", deltaSuffix: " นาที",
+      delta: delta(cur.avgStay, prev.avgStay), deltaGood: "down", deltaFormatAbs: formatMinsDelta,
       sparkline: bucketize(staysWithEntry, t => t.arrivedAt, t => workTimeValue(t.invoicedAt) - workTimeValue(t.arrivedAt)),
     },
     {
       type: "exit", icon: "exit", accent: "#4a3aa7", title: "รถออก (ตรงเวลา / สาย)",
-      onTimePct: cur.exitedOnTimePct, onTimeDelta: delta(cur.exitedOnTimePct, prev.exitedOnTimePct),
+      onTimePct: cur.exitedOnTimePct, onTimeCount: cur.exitedOnTimeCount, onTimeDelta: delta(cur.exitedOnTimePct, prev.exitedOnTimePct),
       lateCount: cur.exitedLateCount, latePct: cur.exitedLatePct, lateDelta: delta(cur.exitedLateCount, prev.exitedLateCount),
       sparkline: bucketize(activeTrucks.filter(t => t.invoicedAt), t => t.invoicedAt),
     },
@@ -3558,17 +3564,17 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
           {statCards.map(c => {
             if (c.type === "entry") return (
               <EntryStatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title}
-                count={c.count} countDelta={c.countDelta} onTimePct={c.onTimePct} onTimeDelta={c.onTimeDelta}
+                count={c.count} countDelta={c.countDelta} onTimePct={c.onTimePct} onTimeCount={c.onTimeCount} onTimeDelta={c.onTimeDelta}
                 sparkline={c.sparkline} />
             );
             if (c.type === "exit") return (
               <ExitStatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title}
-                onTimePct={c.onTimePct} onTimeDelta={c.onTimeDelta} lateCount={c.lateCount} latePct={c.latePct} lateDelta={c.lateDelta}
+                onTimePct={c.onTimePct} onTimeCount={c.onTimeCount} onTimeDelta={c.onTimeDelta} lateCount={c.lateCount} latePct={c.latePct} lateDelta={c.lateDelta}
                 sparkline={c.sparkline} />
             );
             return (
               <StatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title} value={c.value} unit={c.unit}
-                delta={c.delta} deltaGood={c.deltaGood} deltaSuffix={c.deltaSuffix} sparkline={c.sparkline} />
+                delta={c.delta} deltaGood={c.deltaGood} deltaSuffix={c.deltaSuffix} deltaFormatAbs={c.deltaFormatAbs} sparkline={c.sparkline} />
             );
           })}
         </div>
