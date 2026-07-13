@@ -3233,17 +3233,17 @@ const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, prevOnTimeP
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
             {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
         </div>
         <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
         <div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>สาย{latePct != null ? ` (${latePct}%)` : ""}</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#e34948", lineHeight: 1, whiteSpace: "nowrap" }}>
             {lateCount}<span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>คัน</span>
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>สาย{latePct != null ? ` (${latePct}%)` : ""}</div>
         </div>
       </div>
       <Sparkline data={sparkline} accent={accent} />
@@ -3269,17 +3269,17 @@ const EntryStatTile = ({ icon, accent, title, count, prevCount, onTimePct, onTim
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>เข้าโรงงาน</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#0b0b0b", lineHeight: 1, whiteSpace: "nowrap" }}>
             {count}<span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>คัน</span>
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>เข้าโรงงาน</div>
         </div>
         <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
         <div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#1baf7a", lineHeight: 1, whiteSpace: "nowrap" }}>
             {onTimePct != null ? onTimePct : "—"}{onTimePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
           </div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginTop: 2, whiteSpace: "nowrap" }}>ตรงเวลา{onTimeCount != null ? ` (${onTimeCount} คัน)` : ""}</div>
         </div>
       </div>
       <Sparkline data={sparkline} accent={accent} />
