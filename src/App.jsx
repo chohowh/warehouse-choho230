@@ -3221,7 +3221,7 @@ const StatTile = ({ icon, accent, title, value, unit, prevValue, sparkline }) =>
 );
 
 // combined tile for exit on-time % + late count — two figures, one "รถออก" story
-const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, prevOnTimePct, lateCount, latePct, prevLateCount, sparkline }) => (
+const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, prevOnTimePct, lateCount, latePct, prevLatePct, sparkline }) => (
   <div style={{ background: "#fff", borderRadius: 16, padding: "16px 16px 14px", boxShadow: "0 1px 2px rgba(11,11,11,0.06), 0 8px 20px rgba(11,11,11,0.07)", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 30, height: 30, borderRadius: "50%", background: `${accent}1A`, color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -3240,9 +3240,9 @@ const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, prevOnTimeP
         </div>
         <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
         <div>
-          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>สาย{latePct != null ? ` (${latePct}%)` : ""}</div>
+          <div style={{ fontSize: 10.5, color: "#898781", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap" }}>สาย{lateCount != null ? ` (${lateCount} คัน)` : ""}</div>
           <div style={{ fontSize: 26, fontWeight: 900, color: "#e34948", lineHeight: 1, whiteSpace: "nowrap" }}>
-            {lateCount}<span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>คัน</span>
+            {latePct != null ? latePct : "—"}{latePct != null ? <span style={{ fontSize: 13, fontWeight: 700, color: "#898781", marginLeft: 2 }}>%</span> : null}
           </div>
         </div>
       </div>
@@ -3251,7 +3251,7 @@ const ExitStatTile = ({ icon, accent, title, onTimePct, onTimeCount, prevOnTimeP
 
     <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
       <PrevNote label="เมื่อวานตรงเวลา" value={prevOnTimePct != null ? `${prevOnTimePct}%` : "—"} />
-      <PrevNote label="เมื่อวานสาย" value={`${prevLateCount ?? "—"} คัน`} />
+      <PrevNote label="เมื่อวานสาย" value={prevLatePct != null ? `${prevLatePct}%` : "—"} />
     </div>
   </div>
 );
@@ -3516,7 +3516,7 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
     {
       type: "exit", icon: "exit", accent: "#4a3aa7", title: "รถออก (ตรงเวลา / สาย)",
       onTimePct: cur.exitedOnTimePct, onTimeCount: cur.exitedOnTimeCount, prevOnTimePct: prev.exitedOnTimePct,
-      lateCount: cur.exitedLateCount, latePct: cur.exitedLatePct, prevLateCount: prev.exitedLateCount,
+      lateCount: cur.exitedLateCount, latePct: cur.exitedLatePct, prevLateCount: prev.exitedLateCount, prevLatePct: prev.exitedLatePct,
       sparkline: bucketize(activeTrucks.filter(t => t.invoicedAt), t => t.invoicedAt),
     },
   ];
@@ -3547,7 +3547,7 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
             );
             if (c.type === "exit") return (
               <ExitStatTile key={c.title} icon={c.icon} accent={c.accent} title={c.title}
-                onTimePct={c.onTimePct} onTimeCount={c.onTimeCount} prevOnTimePct={c.prevOnTimePct} lateCount={c.lateCount} latePct={c.latePct} prevLateCount={c.prevLateCount}
+                onTimePct={c.onTimePct} onTimeCount={c.onTimeCount} prevOnTimePct={c.prevOnTimePct} lateCount={c.lateCount} latePct={c.latePct} prevLatePct={c.prevLatePct}
                 sparkline={c.sparkline} />
             );
             return (
