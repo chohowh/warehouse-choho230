@@ -961,18 +961,43 @@ const LGUpload = ({ queue, onSetQueue }) => {
   const [manualData, setManualData] = useState({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [queueSaving, setQueueSaving] = useState(false);
   const startEdit = (q) => { setEditId(q.id); setEditData({ plate: q.plate, customerGroup: q.customerGroup, zone: q.zone || "", entryTime: q.entryTime, exitTime: q.exitTime }); };
   const cancelEdit = () => { setEditId(null); setEditData({}); };
-  const saveEdit = () => {
-    onSetQueue(queue.map(q => q.id === editId ? { ...q, ...editData, zone: editData.zone, time: editData.entryTime } : q));
-    setEditId(null); setEditData({});
+  const saveEdit = async () => {
+    setQueueSaving(true);
+    try {
+      await onSetQueue(queue.map(q => q.id === editId ? { ...q, ...editData, zone: editData.zone, time: editData.entryTime } : q));
+      setEditId(null); setEditData({});
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setQueueSaving(false);
+    }
   };
-  const deleteRow = (id) => { if (window.confirm("ลบรถคันนี้ออกจากคิว?")) onSetQueue(queue.filter(q => q.id !== id)); };
-  const saveManual = () => {
+  const deleteRow = async (id) => {
+    if (!window.confirm("ลบรถคันนี้ออกจากคิว?")) return;
+    setQueueSaving(true);
+    try {
+      await onSetQueue(queue.filter(q => q.id !== id));
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    } finally {
+      setQueueSaving(false);
+    }
+  };
+  const saveManual = async () => {
     if (!manualData.plate) return;
-    onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, date: manualData.date || SHORT_DATE, time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
-    setManualData({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
-    setAddingManual(false);
+    setQueueSaving(true);
+    try {
+      await onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, date: manualData.date || SHORT_DATE, time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
+      setManualData({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
+      setAddingManual(false);
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setQueueSaving(false);
+    }
   };
 
   const inputStyle = { border: "1px solid #d1d5db", borderRadius: 0, padding: "4px 8px", fontSize: 12, width: "100%", boxSizing: "border-box" };
@@ -1170,13 +1195,13 @@ const LGUpload = ({ queue, onSetQueue }) => {
                   const isEditing = editId === q.id;
                   const actions = isEditing ? (
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={saveEdit} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
-                      <button onClick={cancelEdit} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+                      <button onClick={saveEdit} disabled={queueSaving} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{queueSaving ? "..." : "บันทึก"}</button>
+                      <button onClick={cancelEdit} disabled={queueSaving} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
                     </div>
                   ) : (
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={() => startEdit(q)} style={{ background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>แก้ไข</button>
-                      <button onClick={() => deleteRow(q.id)} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 0, padding: "4px 8px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ลบ</button>
+                      <button onClick={() => startEdit(q)} disabled={queueSaving} style={{ background: "#eff6ff", color: "#1d4ed8", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>แก้ไข</button>
+                      <button onClick={() => deleteRow(q.id)} disabled={queueSaving} style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 0, padding: "4px 8px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ลบ</button>
                     </div>
                   );
                   return isMobile ? (
@@ -1257,8 +1282,8 @@ const LGUpload = ({ queue, onSetQueue }) => {
                     </td>
                     <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={saveManual} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
-                        <button onClick={() => setAddingManual(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+                        <button onClick={saveManual} disabled={queueSaving} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{queueSaving ? "..." : "บันทึก"}</button>
+                        <button onClick={() => setAddingManual(false)} disabled={queueSaving} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
                       </div>
                     </td>
                   </tr>
@@ -1272,8 +1297,8 @@ const LGUpload = ({ queue, onSetQueue }) => {
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="HH:MM" value={manualData.exitTime} onChange={e => setManualData(d => ({ ...d, exitTime: e.target.value }))} /></td>
                     <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={saveManual} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
-                        <button onClick={() => setAddingManual(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+                        <button onClick={saveManual} disabled={queueSaving} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{queueSaving ? "..." : "บันทึก"}</button>
+                        <button onClick={() => setAddingManual(false)} disabled={queueSaving} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
                       </div>
                     </td>
                   </tr>
@@ -1498,12 +1523,18 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
     if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     const [isEditing, setIsEditing] = useState(false);
     const [val, setVal] = useState("");
+    const [saving, setSaving] = useState(false);
 
     if (truck.extraStatus) {
       return (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#fee2e2", color: "#991b1b", padding: "4px 8px", borderRadius: 0, fontSize: 11, fontWeight: 700 }}>
           <span>⚠️ {truck.extraStatus}</span>
-          <button onClick={() => onUpdate(truck.id, { extraStatus: "" })} style={{ background: "transparent", border: "none", color: "#991b1b", cursor: "pointer", padding: 0, fontWeight: 900, fontSize: 12 }}>×</button>
+          <button onClick={async () => {
+            setSaving(true);
+            try { await onUpdate(truck.id, { extraStatus: "" }); }
+            catch (e) { alert("บันทึกไม่สำเร็จ: " + e.message); }
+            finally { setSaving(false); }
+          }} disabled={saving} style={{ background: "transparent", border: "none", color: "#991b1b", cursor: "pointer", padding: 0, fontWeight: 900, fontSize: 12 }}>×</button>
         </div>
       );
     }
@@ -1515,8 +1546,18 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
             <option value="รอแปรสินค้า" />
             <option value="ติดปัญหา IT" />
           </datalist>
-          <button onClick={() => { if(val) onUpdate(truck.id, { extraStatus: val, extraStatusAt: TIME_NOW() }); setIsEditing(false); }} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>บันทึก</button>
-          <button onClick={() => setIsEditing(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
+          <button onClick={async () => {
+            if (!val) { setIsEditing(false); return; }
+            setSaving(true);
+            try {
+              await onUpdate(truck.id, { extraStatus: val, extraStatusAt: TIME_NOW() });
+              setIsEditing(false);
+            } catch (e) {
+              alert("บันทึกไม่สำเร็จ: " + e.message);
+              setSaving(false);
+            }
+          }} disabled={saving} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{saving ? "..." : "บันทึก"}</button>
+          <button onClick={() => setIsEditing(false)} disabled={saving} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "2px 6px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>ยกเลิก</button>
         </div>
       );
     }
@@ -1560,24 +1601,34 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
   };
 
   const Step3Cell = ({ truck }) => {
+    const [saving, setSaving] = useState(false);
     if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     if (doneStep3(truck)) return <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
     if (canStep3(truck)) return (
-      <button onClick={() => onUpdate(truck.id, { pickupPrinted: true, status: "picking", pickingAt: TIME_NOW() })}
+      <button onClick={async () => {
+        setSaving(true);
+        try { await onUpdate(truck.id, { pickupPrinted: true, status: "picking", pickingAt: TIME_NOW() }); }
+        catch (e) { alert("บันทึกไม่สำเร็จ: " + e.message); setSaving(false); }
+      }} disabled={saving}
         style={{ background: "#c2410c", color: "#fff", border: "none", borderRadius: 0, padding: "5px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
-        🖨️ เบิก
+        {saving ? "⏳" : "🖨️ เบิก"}
       </button>
     );
     return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
   };
 
   const Step6Cell = ({ truck }) => {
+    const [saving, setSaving] = useState(false);
     if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     if (doneStep6(truck)) return <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
     if (canStep6(truck)) return (
-      <button onClick={() => onUpdate(truck.id, { summaryPrinted: true, summaryPrintedAt: TIME_NOW(), status: "summary_printed" })}
+      <button onClick={async () => {
+        setSaving(true);
+        try { await onUpdate(truck.id, { summaryPrinted: true, summaryPrintedAt: TIME_NOW(), status: "summary_printed" }); }
+        catch (e) { alert("บันทึกไม่สำเร็จ: " + e.message); setSaving(false); }
+      }} disabled={saving}
         style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 0, padding: "5px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
-        🖨️ สรุป
+        {saving ? "⏳" : "🖨️ สรุป"}
       </button>
     );
     return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
@@ -2309,6 +2360,22 @@ const Planning = ({ trucks, queue, onUpdate }) => {
   const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
   const Dash = () => <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
 
+  const InvoiceCell = ({ truck }) => {
+    const [saving, setSaving] = useState(false);
+    if (!truck || !["summary_printed", "invoiced"].includes(truck.status)) return <Dash />;
+    if (truck.status === "invoiced") return <Tick />;
+    return (
+      <button onClick={async () => {
+        setSaving(true);
+        try { await onUpdate(truck.id, { invoiceDone: true, status: "invoiced", invoicedAt: TIME_NOW() }); }
+        catch (e) { alert("บันทึกไม่สำเร็จ: " + e.message); setSaving(false); }
+      }} disabled={saving}
+        style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "5px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
+        {saving ? "⏳" : "ออก Invoice"}
+      </button>
+    );
+  };
+
   return (
     <div>
       <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>📄 ห้องวางแผน</h2>
@@ -2380,17 +2447,7 @@ const Planning = ({ trucks, queue, onUpdate }) => {
                     </td>
                     <td style={{ padding: "10px 12px" }}>{truck?.pickupPrinted ? <Tick/> : <Dash/>}</td>
                     <td style={{ padding: "10px 12px" }}>{truck?.summaryPrinted ? <Tick/> : <Dash/>}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      {!truck || !["summary_printed","invoiced"].includes(truck.status)
-                        ? <Dash/>
-                        : truck.status === "invoiced"
-                        ? <Tick/>
-                        : <button onClick={() => onUpdate(truck.id, { invoiceDone: true, status: "invoiced", invoicedAt: TIME_NOW() })}
-                            style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "5px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
-                            ออก Invoice
-                          </button>
-                      }
-                    </td>
+                    <td style={{ padding: "10px 12px" }}><InvoiceCell truck={truck} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -2551,28 +2608,44 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
     setForm(f => ({ ...f, queueId: q.id, zone: q.zone || "", customerGroup: q.customerGroup || "", entryTime: q.entryTime || "", exitTime: q.exitTime || "" }));
   };
 
+  const [saving, setSaving] = useState(false);
   const save = async () => {
-    await onUpdate(selId, form);
-    setMsg("✅ บันทึกแล้ว");
-    setTimeout(() => setMsg(""), 2500);
+    setSaving(true);
+    try {
+      await onUpdate(selId, form);
+      setMsg("✅ บันทึกแล้ว");
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const [merging, setMerging] = useState(false);
   const handleMerge = async () => {
     const src = trucks.find(t => t.id === mergeId);
     if (!src || !truck) return;
     if (!window.confirm(`Merge ข้อมูลจาก ${src.plate} (zone: ${src.zone || "–"}) เข้า ${truck.plate} (zone: ${truck.zone || "–"}) แล้วลบรถต้นทางออก?`)) return;
-    // merge lane-by-lane: T-1 (target) มีสิทธิ์ก่อน ถ้า T-1 ไม่มีค่อยเอาของ T-2
-    const mergedQC   = { ...(src.qcLanes   || {}) };
-    const mergedLoad = { ...(src.loadLanes  || {}) };
-    for (const l of LOADING_LANES) {
-      if (truck.qcLanes?.[l.id]?.done)   mergedQC[l.id]   = truck.qcLanes[l.id];
-      if (truck.loadLanes?.[l.id]?.done)  mergedLoad[l.id] = truck.loadLanes[l.id];
+    setMerging(true);
+    try {
+      // merge lane-by-lane: T-1 (target) มีสิทธิ์ก่อน ถ้า T-1 ไม่มีค่อยเอาของ T-2
+      const mergedQC   = { ...(src.qcLanes   || {}) };
+      const mergedLoad = { ...(src.loadLanes  || {}) };
+      for (const l of LOADING_LANES) {
+        if (truck.qcLanes?.[l.id]?.done)   mergedQC[l.id]   = truck.qcLanes[l.id];
+        if (truck.loadLanes?.[l.id]?.done)  mergedLoad[l.id] = truck.loadLanes[l.id];
+      }
+      await onUpdate(selId, { qcLanes: mergedQC, loadLanes: mergedLoad });
+      await onDeleteTruck(mergeId);
+      setMergeId("");
+      setMsg("✅ Merge สำเร็จ — ลบรถซ้ำแล้ว");
+      setTimeout(() => setMsg(""), 3000);
+    } catch (e) {
+      alert("Merge ไม่สำเร็จ: " + e.message);
+    } finally {
+      setMerging(false);
     }
-    await onUpdate(selId, { qcLanes: mergedQC, loadLanes: mergedLoad });
-    await onDeleteTruck(mergeId);
-    setMergeId("");
-    setMsg("✅ Merge สำเร็จ — ลบรถซ้ำแล้ว");
-    setTimeout(() => setMsg(""), 3000);
   };
 
   const setQC   = (lid, key, val) => setForm(f => ({ ...f, qcLanes:   { ...f.qcLanes,   [lid]: { ...(f.qcLanes[lid]   || {}), [key]: val } } }));
@@ -2615,9 +2688,9 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
               </option>
             ))}
           </select>
-          <button onClick={handleMerge} disabled={!mergeId}
+          <button onClick={handleMerge} disabled={!mergeId || merging}
             style={{ width: "100%", background: mergeId ? "#854d0e" : "#e5e7eb", color: mergeId ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "11px 0", fontSize: 14, fontWeight: 700, cursor: mergeId ? "pointer" : "default" }}>
-            🔀 Merge และลบรถ source
+            {merging ? "⏳ กำลัง Merge..." : "🔀 Merge และลบรถ source"}
           </button>
         </div>
       )}
@@ -2739,9 +2812,9 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
           </div>
 
           {msg && <div style={{ textAlign: "center", color: "#10b981", fontWeight: 700, marginBottom: 12, fontSize: 15 }}>{msg}</div>}
-          <button onClick={save}
+          <button onClick={save} disabled={saving}
             style={{ width: "100%", background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
-            💾 บันทึกการแก้ไข
+            {saving ? "⏳ กำลังบันทึก..." : "💾 บันทึกการแก้ไข"}
           </button>
           <button onClick={() => { if (window.confirm(`ลบรถ ${truck.plate} ออกจากระบบ?`)) onDeleteTruck(truck.id); }}
             style={{ width: "100%", background: "#fee2e2", color: "#991b1b", border: "1.5px solid #fca5a5", borderRadius: 0, padding: "12px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
@@ -3780,7 +3853,7 @@ const LaneSelect = ({ tabs, roleLabel, onSelect, onBack }) => (
 // MAIN APP
 // ─────────────────────────────────────────────────────────────────────────────
 const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue").select("*");  return (data || []).map(r => r.data).sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity)); };
-const fetchTrucks = async () => { const { data } = await supabase.from("wh_trucks").select("*"); return (data || []).map(r => r.data); };
+const fetchTrucks = async () => { const { data, error } = await supabase.from("wh_trucks").select("*"); if (error) throw error; return (data || []).map(r => r.data); };
 const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "master"); return data && data[0] ? (data[0].data || []) : []; };
 const fetchDetailSrc = async (date = cycleDateStr()) => {
   const ids = DETAIL_SOURCES.map(s => `detail_${s.id}_${date}`);
@@ -3844,7 +3917,7 @@ export default function App() {
 
   useEffect(() => {
     fetchQueue().then(setQueue);
-    fetchTrucks().then(setTrucks);
+    fetchTrucks().then(setTrucks).catch(err => console.error("fetchTrucks failed:", err));
     fetchMaster().then(rows => {
       if (rows.length > 0) {
         setMasterLane(rows);
@@ -3854,7 +3927,7 @@ export default function App() {
 
     const channel = supabase.channel("app-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "wh_queue" },  () => fetchQueue().then(setQueue))
-      .on("postgres_changes", { event: "*", schema: "public", table: "wh_trucks" }, () => fetchTrucks().then(setTrucks))
+      .on("postgres_changes", { event: "*", schema: "public", table: "wh_trucks" }, () => fetchTrucks().then(setTrucks).catch(err => console.error("fetchTrucks failed:", err)))
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -3920,7 +3993,7 @@ export default function App() {
 
   const handleUpdate = async (id, upd) => {
     const truck = trucks.find(t => t.id === id);
-    if (!truck) return;
+    if (!truck) throw new Error("ไม่พบข้อมูลรถคันนี้ในเครื่อง กรุณารีเฟรชหน้าจอแล้วลองใหม่");
 
     if (upd.loadLanes) {
        for (const lane of Object.keys(upd.loadLanes)) {
