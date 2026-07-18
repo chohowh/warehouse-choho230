@@ -170,6 +170,7 @@ const QRCodeDisplay = ({ url, size = 220 }) => (
 
 const QR_ITEMS = [
   { mode: "driver",        emoji: "🚛", label: "คนขับ เช็คอิน",     color: "#111",    bg: "#f9fafb" },
+  { mode: "dashboard_transport", emoji: "📊", label: "Dashboard ขนส่ง", color: "#0ea5e9", bg: "#f0f9ff" },
   { mode: "qc_parts",      emoji: "🌡️", label: "ลานโหลด ชิ้นส่วน",      color: "#0369a1", bg: "#f0f9ff" },
   { mode: "qc_head",       emoji: "🌡️", label: "ลานโหลด หัว/เครื่องใน", color: "#0369a1", bg: "#f0f9ff" },
   { mode: "qc_pork",       emoji: "🌡️", label: "ลานโหลด หมูซีก",       color: "#0369a1", bg: "#f0f9ff" },
@@ -605,8 +606,10 @@ const exportArchiveExcel = async (dateStr) => {
 
 const LANE_LABEL = { lane_parts: "ลานชิ้นส่วน", lane_head: "ลานหัว/เครื่องใน", lane_pork: "ลานหมูซีก" };
 
-const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemMins }) => {
+const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemMins, myPlate }) => {
   const containerRef = useRef(null);
+  const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
+  const isMyPlate = (plate) => !!myPlate && plateNum(plate) === plateNum(myPlate) && plateNum(myPlate) !== "";
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTvMode, setIsTvMode] = useState(false);
   const isMobile = useIsMobile();
@@ -674,8 +677,9 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
               const rem = getRemMins({ date, exitTime });
               const urgent = rem < 20 && truck?.status !== "invoiced";
               const anyQC = LOADING_LANES.some(l => truck?.qcLanes?.[l.id]?.done);
+              const mine = isMyPlate(plate);
               return (
-                <div key={key} style={{ background: urgent ? "#fff5f5" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : "1px solid #f3f4f6" }}>
+                <div key={key} style={{ background: urgent ? "#fff5f5" : mine ? "#eff6ff" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : mine ? "1.5px solid #bfdbfe" : "1px solid #f3f4f6" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
@@ -736,8 +740,9 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                 {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
                   const rem = getRemMins({ date, exitTime });
                   const urgent = rem < 20 && truck?.status !== "invoiced";
+                  const mine = isMyPlate(plate);
                   return (
-                    <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6", background: mine ? "#eff6ff" : undefined }}>
                       <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 22 : undefined }}>{plate}</td>
                       {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
                       <td style={{ padding: tdP, whiteSpace: "nowrap", verticalAlign: "top" }}>
@@ -798,7 +803,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
   );
 };
 
-const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
+const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) => {
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
   const [searchPlate, setSearchPlate] = useState("");
   const isMobile = useIsMobile();
@@ -866,12 +871,12 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap }) => {
       {/* Sticky header */}
       <div style={{ position: "sticky", top: 80, zIndex: 40, background: "#f1f5f9", paddingBottom: isMobile ? 6 : 8, paddingTop: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
-          <h2 style={{ margin: 0, fontSize: isMobile ? 16 : 22, fontWeight: 900 }}>{lane ? LANE_LABEL[lane] : "Main Dashboard"}</h2>
+          <h2 style={{ margin: 0, fontSize: isMobile ? 16 : 22, fontWeight: 900 }}>{title || (lane ? LANE_LABEL[lane] : "Main Dashboard")}</h2>
         </div>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", marginTop: 8 }}>
-        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} />
+        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} myPlate={myPlate} />
       </div>
     </div>
   );
@@ -3791,7 +3796,7 @@ const ROLE_TABS = {
   office_wh:    ["picking"],
   office_plan:  ["planning", "detail_loading"],
   lg:           ["lg"],
-  dashboard_only: ["dashboard"],
+  dashboard_only: ["dashboard", "dashboard_transport"],
   loading_data: ["overview_log"],
   tracking:     ["work_tracking"],
   all:          null,
@@ -3883,7 +3888,8 @@ export default function App() {
     const allowed = ROLE_TABS[r];
     return (allowed && !allowed.includes("dashboard")) ? allowed[0] : "dashboard";
   };
-  const [role,       setRole]       = useState("");
+  const _urlModeInit = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
+  const [role,       setRole]       = useState(() => _urlModeInit === "dashboard_transport" ? "dashboard_only" : "");
   const handleSelectRole = (r) => { setRole(r); setTab(defaultTabForRole(r)); };
   const handleChangeRole = () => { setRole(""); setTab("dashboard"); };
   const [queue,      setQueue]      = useState([]);
@@ -3891,9 +3897,10 @@ export default function App() {
   const [masterLane, setMasterLane] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wh_master_cache") || "[]"); } catch { return []; }
   });
+  const [myPlate, setMyPlate] = useState(() => localStorage.getItem("wh_my_plate") || "");
   const [detailMapByChannel, setDetailMapByChannel] = useState({}); // { channelId: plate→Set(lanes) }
   const [srcVersion, setSrcVersion] = useState(0);  // bumped when source files change
-  const [tab,        setTab]        = useState("dashboard");
+  const [tab,        setTab]        = useState(() => _urlModeInit === "dashboard_transport" ? "dashboard_transport" : "dashboard");
   const [dashLane,   setDashLane]   = useState("main");
   const [time,       setTime]       = useState(TIME_NOW());
   const [loading,    setLoading]    = useState(true);
@@ -3987,6 +3994,9 @@ export default function App() {
     await supabase.from("wh_trucks").upsert({ id: t.id, data: t });
     setTrucks(prev => [...prev.filter(tr => tr.id !== t.id), t]);
 
+    localStorage.setItem("wh_my_plate", t.plate);
+    setMyPlate(t.plate);
+
     const actualTime = TIME_NOW();
     const diffStr = calcTimeDiffStr(t.entryTime, actualTime);
   };
@@ -4009,6 +4019,11 @@ export default function App() {
     const { error } = await supabase.from("wh_trucks").upsert({ id, data: updated });
     if (error) throw error;
     setTrucks(prev => prev.map(t => t.id === id ? updated : t));
+
+    if (upd.status === "invoiced" && myPlate && plateNum(updated.plate) === plateNum(myPlate)) {
+      localStorage.removeItem("wh_my_plate");
+      setMyPlate("");
+    }
   };
 
   const handleDeleteTruck = async (id) => {
@@ -4060,6 +4075,7 @@ export default function App() {
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: "chart"     },
+    { id: "dashboard_transport", label: "Dashboard ขนส่ง", icon: "chart" },
     { id: "lg",        label: "LG",      icon: "upload"    },
     { id: "driver",    label: "คนขับ",   icon: "scan"      },
     { id: "picking",   label: "Picking", icon: "clipboard" },
@@ -4261,8 +4277,9 @@ export default function App() {
         </div>
         {!isNarrow && <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
       </div>
-      <div style={{ maxWidth: tab === "dashboard" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
-        {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} />}
+      <div style={{ maxWidth: tab === "dashboard" || tab === "dashboard_transport" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" || tab === "dashboard_transport" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
+        {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} myPlate={myPlate} />}
+        {tab === "dashboard_transport" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} />}
         {tab === "qr"        && <QRCodePage />}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
