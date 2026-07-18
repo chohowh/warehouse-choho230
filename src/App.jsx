@@ -3888,8 +3888,7 @@ export default function App() {
     const allowed = ROLE_TABS[r];
     return (allowed && !allowed.includes("dashboard")) ? allowed[0] : "dashboard";
   };
-  const _urlModeInit = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mode") : null;
-  const [role,       setRole]       = useState(() => _urlModeInit === "dashboard_transport" ? "dashboard_only" : "");
+  const [role,       setRole]       = useState("");
   const handleSelectRole = (r) => { setRole(r); setTab(defaultTabForRole(r)); };
   const handleChangeRole = () => { setRole(""); setTab("dashboard"); };
   const [queue,      setQueue]      = useState([]);
@@ -3900,7 +3899,7 @@ export default function App() {
   const [myPlate, setMyPlate] = useState(() => localStorage.getItem("wh_my_plate") || "");
   const [detailMapByChannel, setDetailMapByChannel] = useState({}); // { channelId: plate→Set(lanes) }
   const [srcVersion, setSrcVersion] = useState(0);  // bumped when source files change
-  const [tab,        setTab]        = useState(() => _urlModeInit === "dashboard_transport" ? "dashboard_transport" : "dashboard");
+  const [tab,        setTab]        = useState("dashboard");
   const [dashLane,   setDashLane]   = useState("main");
   const [time,       setTime]       = useState(TIME_NOW());
   const [loading,    setLoading]    = useState(true);
@@ -3918,6 +3917,7 @@ export default function App() {
   const isSamplePartsMode  = _urlMode === "sample_parts";
   const isSampleHeadMode   = _urlMode === "sample_head";
   const isSamplePorkMode   = _urlMode === "sample_pork";
+  const isDashboardTransportMode = _urlMode === "dashboard_transport";
 
   useEffect(() => { const id = setInterval(() => setTime(TIME_NOW()), 15000); return () => clearInterval(id); }, []);
   useEffect(() => { const id = setInterval(() => setHeaderClock(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })), 1000); return () => clearInterval(id); }, []);
@@ -4107,7 +4107,8 @@ export default function App() {
 
   const isKioskMode = isDriverMode || isQcPartsMode || isQcHeadMode || isQcPorkMode
     || isLoadingPartsMode || isLoadingHeadMode || isLoadingPorkMode
-    || isSamplePartsMode || isSampleHeadMode || isSamplePorkMode;
+    || isSamplePartsMode || isSampleHeadMode || isSamplePorkMode
+    || isDashboardTransportMode;
   const allowedTabIds = ROLE_TABS[role] || null;
   const visibleTabs = allowedTabIds ? tabs.filter(t => allowedTabIds.includes(t.id)) : tabs;
 
@@ -4129,6 +4130,18 @@ export default function App() {
         <KioskHeader emoji="🚛" title="เช็คอินคนขับ" />
         <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 14px 60px" }}>
           <DriverScan queue={queue} trucks={trucks} onScan={handleScan} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Dashboard ขนส่ง kiosk mode ──
+  if (isDashboardTransportMode) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <KioskHeader emoji="📊" title="Dashboard ขนส่ง" color="#0ea5e9" />
+        <div style={{ padding: isMobile ? "8px 10px 80px" : "8px 14px 14px" }}>
+          <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} />
         </div>
       </div>
     );
