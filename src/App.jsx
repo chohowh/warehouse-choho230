@@ -673,7 +673,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
           </div>
         : isMobile && !fs
         ? <div style={{ padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", maxHeight: "calc(100vh - 130px)" }}>
-            {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
+            {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck, assignedLanes }) => {
               const rem = getRemMins({ date, exitTime });
               const urgent = rem < 20 && truck?.status !== "invoiced";
               const anyQC = LOADING_LANES.some(l => truck?.qcLanes?.[l.id]?.done);
@@ -700,14 +700,19 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                     {!truck
                       ? <span style={{ fontSize: 12, color: "#9ca3af", background: "#f9fafb", borderRadius: 0, padding: "4px 10px" }}>รอเช็คอิน</span>
                       : !anyQC
-                      ? <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด</span>
+                      ? (assignedLanes?.size
+                          ? LOADING_LANES.filter(l => assignedLanes.has(l.id)).map(l => (
+                              <span key={l.id} style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด {l.tinyLabel}</span>
+                            ))
+                          : <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด</span>)
                       : LOADING_LANES.map(l => {
                           const loaded = truck.loadLanes?.[l.id]?.done;
                           const qcDone = truck.qcLanes?.[l.id]?.done;
                           const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
                           if (loaded) return <span key={l.id} style={{ background: "#10b981", color: "#fff", borderRadius: 0, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>✓ {l.tinyLabel}</span>;
-                          if (waiting) return <span key={l.id} style={{ background: "#fbbf24", color: "#fff", borderRadius: 0, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>⏳ รอสินค้า {l.tinyLabel}</span>;
-                          if (qcDone) return <span key={l.id} style={{ background: "#fff7ed", color: "#f97316", borderRadius: 0, padding: "4px 12px", fontSize: 12, fontWeight: 700, border: "1px solid #fed7aa" }}>โหลด {l.tinyLabel}</span>;
+                          if (waiting) return <span key={l.id} style={{ background: "#fbbf24", color: "#fff", borderRadius: 0, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>⏳ รอสินค้า {l.tinyLabel}{truck.loadLanes?.[l.id]?.waitingFor ? ` — ${truck.loadLanes[l.id].waitingFor}` : ""}</span>;
+                          if (qcDone) return <span key={l.id} style={{ background: "#fff7ed", color: "#f97316", borderRadius: 0, padding: "4px 12px", fontSize: 12, fontWeight: 700, border: "1px solid #fed7aa" }}>กำลังโหลด {l.tinyLabel}</span>;
+                          if (assignedLanes?.has(l.id)) return <span key={l.id} style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด {l.tinyLabel}</span>;
                           return null;
                         })
                     }
@@ -737,7 +742,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck }) => {
+                {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck, assignedLanes }) => {
                   const rem = getRemMins({ date, exitTime });
                   const urgent = rem < 20 && truck?.status !== "invoiced";
                   const mine = isMyPlate(plate);
@@ -757,7 +762,19 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                           ? <span style={{ fontSize: fs ? 16 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
                           : (() => {
                               const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
-                              if (!anyQC) return <span style={{ fontSize: fs ? 16 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
+                              if (!anyQC) {
+                                if (!assignedLanes?.size) return <span style={{ fontSize: fs ? 16 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
+                                const pending = LOADING_LANES.filter(l => assignedLanes.has(l.id));
+                                return (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 6 : 4 }}>
+                                    {pending.map(l => (
+                                      <span key={l.id} style={{ fontSize: fs ? 16 : 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: fs ? "5px 14px" : "3px 10px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                                        รอเข้าโหลด {l.tinyLabel}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              }
                               return (
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 6 : 4 }}>
                                   {LOADING_LANES.map(l => {
@@ -772,11 +789,16 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                                     );
                                     if (waiting) return (
                                       <div key={l.id} style={{ position: "relative", display: "inline-block", background: "#fbbf24", color: "#fff", borderRadius: 0, padding: fs ? "5px 14px 7px 12px" : "3px 10px 5px 8px", fontSize: fs ? 16 : 11, fontWeight: 700, lineHeight: 1.4, whiteSpace: "nowrap" }}>
-                                        รอสินค้า {l.tinyLabel}
+                                        รอสินค้า {l.tinyLabel}{truck.loadLanes?.[l.id]?.waitingFor ? ` — ${truck.loadLanes[l.id].waitingFor}` : ""}
                                         <span style={{ position: "absolute", bottom: -4, right: -4, background: "#d97706", border: "2px solid #fff", borderRadius: "50%", width: fs ? 18 : 14, height: fs ? 18 : 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs ? 10 : 8 }}>⏳</span>
                                       </div>
                                     );
                                     if (qcDone) return <span key={l.id} style={{ fontSize: fs ? 16 : 11, color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>กำลังโหลด {l.tinyLabel}</span>;
+                                    if (assignedLanes?.has(l.id)) return (
+                                      <span key={l.id} style={{ fontSize: fs ? 16 : 11, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: fs ? "5px 14px" : "3px 10px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                                        รอเข้าโหลด {l.tinyLabel}
+                                      </span>
+                                    );
                                     return null;
                                   })}
                                 </div>
@@ -833,11 +855,14 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) 
     if (t) usedDash.add(t.id);
     return t;
   };
-  const dashQueueRows = queue.map(q => ({ key: q.id, date: q.date || "", plate: q.plate, customerGroup: q.customerGroup, entryTime: q.entryTime, exitTime: q.exitTime, truck: matchTruckDash(q) }));
+  const dashQueueRows = queue.map(q => {
+    const truck = matchTruckDash(q);
+    return { key: q.id, date: q.date || "", plate: q.plate, customerGroup: q.customerGroup, entryTime: q.entryTime, exitTime: q.exitTime, truck, assignedLanes: laneMatchForTruck(truck, detailMap) };
+  });
   const walkIns = trucks.filter(t => !usedDash.has(t.id));
   const allRows = [
     ...dashQueueRows,
-    ...walkIns.map(t => ({ key: t.id, date: t.date || "", plate: t.plate, customerGroup: t.customerGroup || "–", entryTime: t.entryTime || "", exitTime: t.exitTime || "", truck: t })),
+    ...walkIns.map(t => ({ key: t.id, date: t.date || "", plate: t.plate, customerGroup: t.customerGroup || "–", entryTime: t.entryTime || "", exitTime: t.exitTime || "", truck: t, assignedLanes: laneMatchForTruck(t, detailMap) })),
   ].filter(row => row.customerGroup !== "CPFTH")
   .filter(row => !lane || !row.truck?.loadLanes?.[lane]?.done)
   .sort((a, b) => {
@@ -1971,16 +1996,35 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
 };
 
 // ── 5. LOADING YARD (per-lane gate) ───────────────────────────────────────────
-const LoadingYard = ({ trucks, onUpdate, laneId }) => {
+const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const [activeLane, setActiveLane] = useState(laneId ?? "lane_parts");
+  const emptyBaskets = () => ({ yellowBig: "", yellowSmall: "", gray: "", hooks: "", payer: "" });
   const [forms, setForms] = useState({
-    lane_parts: { selId: "", photo: null, note: "", flash: false, uploading: false },
-    lane_head:  { selId: "", photo: null, note: "", flash: false, uploading: false },
-    lane_pork:  { selId: "", photo: null, note: "", flash: false, uploading: false },
+    lane_parts: { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
+    lane_head:  { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
+    lane_pork:  { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
   });
   const setF = (lId, upd) => setForms(p => ({ ...p, [lId]: { ...p[lId], ...upd } }));
   const curLane = LOADING_LANES.find(l => l.id === activeLane);
   const form    = forms[activeLane];
+  const setBasket = (key, val) => setF(activeLane, { baskets: { ...form.baskets, [key]: val } });
+  const basketTotal = ["yellowBig", "yellowSmall", "gray"].reduce((sum, k) => sum + (Number(form.baskets?.[k]) || 0), 0);
+  const [waitingModal, setWaitingModal] = useState(false);
+  const [waitingReasons, setWaitingReasons] = useState([""]);
+  const MAX_WAITING_REASONS = 3;
+  const setReasonAt = (idx, val) => setWaitingReasons(rs => rs.map((r, i) => i === idx ? val : r));
+  const addReasonField = () => setWaitingReasons(rs => rs.length >= MAX_WAITING_REASONS ? rs : [...rs, ""]);
+  const removeReasonField = (idx) => setWaitingReasons(rs => rs.length <= 1 ? rs : rs.filter((_, i) => i !== idx));
+
+  // ตัวเลือก dropdown ของ popup "รอสินค้าอะไร" — ชื่อสินค้าจาก Master ลานโหลด กรองเฉพาะลานที่เปิดอยู่
+  const waitingOptions = (() => {
+    const names = new Set();
+    for (const m of masterLane) {
+      if (m.laneKey === activeLane && m.productNameTha) names.add(m.productNameTha);
+    }
+    if (names.size) return [...names].sort((a, b) => a.localeCompare(b, "th"));
+    return ["รอเบิกสินค้าจากคลัง", "รอแพ็ค/ชั่งน้ำหนักสินค้า", "รอสินค้าจากไลน์ผลิต", "รอรถขนย้ายภายใน"];
+  })();
 
   // รถที่ QC ลานนี้ผ่านแล้ว และยังไม่ได้โหลดลานนี้
   const eligibleForLane = (laneId) => trucks.filter(t =>
@@ -2003,14 +2047,21 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
     }).catch(err => alert(err.message));
   };
 
-  const handleWaiting = async () => {
+  const openWaitingModal = () => {
     if (!sel || form.uploading) return;
-    if (!window.confirm(`ยืนยัน: ${sel.plate} — รอเติมสินค้า?`)) return;
+    setWaitingReasons([""]);
+    setWaitingModal(true);
+  };
+
+  const confirmWaiting = async () => {
+    const combinedReason = waitingReasons.map(r => r.trim()).filter(Boolean).join(", ");
+    if (!sel || form.uploading || !combinedReason) return;
+    setWaitingModal(false);
     setF(activeLane, { uploading: true });
     try {
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), note: form.note } };
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), waitingFor: combinedReason, note: form.note } };
       await onUpdate(sel.id, { loadLanes });
-      setF(activeLane, { selId: "", photo: null, note: "", uploading: false });
+      setF(activeLane, { selId: "", photo: null, note: "", uploading: false, baskets: emptyBaskets() });
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
       setF(activeLane, { uploading: false });
@@ -2025,9 +2076,16 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
       const photos = Array.isArray(form.photo) ? form.photo : (form.photo ? [form.photo] : []);
       const photoUrls = await uploadPhotos(`loading/${activeLane}`, sel.plate, photos);
       const existing = sel.loadLanes?.[activeLane] || {};
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW() } };
+      const baskets = {
+        yellowBig:   Number(form.baskets?.yellowBig) || 0,
+        yellowSmall: Number(form.baskets?.yellowSmall) || 0,
+        gray:        Number(form.baskets?.gray) || 0,
+        hooks:       Number(form.baskets?.hooks) || 0,
+      };
+      const basketPayer = (form.baskets?.payer || "").trim();
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer } };
       await onUpdate(sel.id, { loadLanes });
-      setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false });
+      setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false, baskets: emptyBaskets() });
       setTimeout(() => setF(activeLane, { flash: false }), 2500);
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
@@ -2091,7 +2149,46 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
           style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "10px 12px", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
         />
         <PhotoUploader label="📷 ถ่ายรูปหลังโหลดเสร็จ" value={form.photo} onChange={handlePhoto(activeLane)} onRemove={photos => setF(activeLane, { photo: photos })} />
-        <button onClick={handleWaiting} disabled={!sel || form.uploading}
+
+        <div style={{ marginTop: 4, marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "#374151", marginBottom: 8 }}>🧺 ยอดตะกร้า / ตะขอ</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (ใหญ่)</label>
+              <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowBig ?? ""} onChange={e => setBasket("yellowBig", e.target.value)}
+                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (เล็ก)</label>
+              <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowSmall ?? ""} onChange={e => setBasket("yellowSmall", e.target.value)}
+                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เทา</label>
+              <input type="number" min="0" inputMode="numeric" value={form.baskets?.gray ?? ""} onChange={e => setBasket("gray", e.target.value)}
+                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตะขอแขวนซาก</label>
+              <input type="number" min="0" inputMode="numeric" value={form.baskets?.hooks ?? ""} onChange={e => setBasket("hooks", e.target.value)}
+                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>รวมตะกร้า</label>
+              <div style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, color: curLane.color, background: "#fff", border: `1.5px solid ${curLane.border}`, boxSizing: "border-box" }}>{basketTotal}</div>
+            </div>
+          </div>
+          <input
+            placeholder="ชื่อผู้จ่ายตะกร้า"
+            value={form.baskets?.payer ?? ""}
+            onChange={e => setBasket("payer", e.target.value)}
+            style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "9px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <button onClick={openWaitingModal} disabled={!sel || form.uploading}
           style={{ width: "100%", background: sel && !form.uploading ? "#f59e0b" : "#e5e7eb", color: sel && !form.uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: sel && !form.uploading ? "pointer" : "default", marginBottom: 8 }}>
           ⏳ รอเติมสินค้า
         </button>
@@ -2100,6 +2197,58 @@ const LoadingYard = ({ trucks, onUpdate, laneId }) => {
           {form.uploading ? "⏳ กำลังอัพโหลดรูป..." : "✅ บันทึกโหลดเสร็จ"}
         </button>
       </div>
+
+      {waitingModal && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}
+          onClick={() => setWaitingModal(false)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: 0, padding: 22, width: "min(420px, 100%)", boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>⏳ {sel?.plate} — รอสินค้าอะไร?</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>พิมพ์เอง หรือเลือกจากตัวเลือกด้านล่าง — รอได้หลายอย่าง กด "+ เพิ่มรายการ"</div>
+            {waitingReasons.map((reason, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                <input
+                  list="waitingReasonOptions"
+                  autoFocus={idx === 0}
+                  value={reason}
+                  onChange={e => setReasonAt(idx, e.target.value)}
+                  placeholder="เช่น รอเบิกสินค้าจากคลัง..."
+                  style={{ flex: 1, border: "1.5px solid #d1d5db", borderRadius: 0, padding: "11px 12px", fontSize: 15, outline: "none", boxSizing: "border-box" }}
+                />
+                {waitingReasons.length > 1 && (
+                  <button onClick={() => removeReasonField(idx)}
+                    style={{ background: "#f3f4f6", color: "#6b7280", border: "none", borderRadius: 0, padding: "0 14px", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <datalist id="waitingReasonOptions">
+              {waitingOptions.map(opt => <option key={opt} value={opt} />)}
+            </datalist>
+            {waitingReasons.length < MAX_WAITING_REASONS && (
+              <button onClick={addReasonField}
+                style={{ background: "transparent", color: "#f59e0b", border: "1.5px dashed #f59e0b", borderRadius: 0, padding: "8px 0", width: "100%", fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 16 }}>
+                + เพิ่มรายการ
+              </button>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: waitingReasons.length < MAX_WAITING_REASONS ? 0 : 16 }}>
+              <button onClick={() => setWaitingModal(false)}
+                style={{ flex: 1, background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "12px 0", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                ยกเลิก
+              </button>
+              <button onClick={confirmWaiting} disabled={!waitingReasons.some(r => r.trim())}
+                style={{ flex: 1, background: waitingReasons.some(r => r.trim()) ? "#f59e0b" : "#e5e7eb", color: waitingReasons.some(r => r.trim()) ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "12px 0", fontWeight: 700, fontSize: 14, cursor: waitingReasons.some(r => r.trim()) ? "pointer" : "default" }}>
+                ยืนยัน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -2336,6 +2485,302 @@ const LOG_SOURCES = {
 const OverviewLog = ({ trucks }) => (
   <EventLog trucks={trucks} title="💬 Log ภาพรวมการทำงาน" emptyMsg="ยังไม่มีรายการทำงาน" />
 );
+
+// ── 6.6 BASKET / HOOK SUMMARY (ยอดตะกร้า,ตะขอรายวัน) ─────────────────────────
+const BasketSummary = ({ trucks }) => {
+  const isMobile = useIsMobile();
+  const today = cycleDateStr();
+  const [date, setDate] = useState(today);
+  const [plateFilter, setPlateFilter] = useState("");
+  const [archiveTrucks, setArchiveTrucks] = useState(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+
+  useEffect(() => {
+    setArchiveTrucks(null);
+    setLoadingArchive(date !== today);
+    supabase.from("wh_archive").select("trucks").eq("archive_date", date).single()
+      .then(({ data }) => setArchiveTrucks(data?.trucks ?? null))
+      .finally(() => setLoadingArchive(false));
+  }, [date, today]);
+
+  const sourceTrucks = archiveTrucks ?? (date === today ? trucks : []);
+
+  const th = { padding: "10px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", whiteSpace: "nowrap" };
+  const td = { padding: "10px 12px", textAlign: "center", borderBottom: "1px solid #f3f4f6" };
+  const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
+
+  const totals = {};
+  const payersByLane = {};
+  for (const l of LOADING_LANES) { totals[l.id] = { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 }; payersByLane[l.id] = new Set(); }
+
+  const detailRows = [];
+  for (const t of sourceTrucks) {
+    for (const l of LOADING_LANES) {
+      const ld = t.loadLanes?.[l.id];
+      if (!ld?.baskets) continue;
+      totals[l.id].yellowBig   += ld.baskets.yellowBig || 0;
+      totals[l.id].yellowSmall += ld.baskets.yellowSmall || 0;
+      totals[l.id].gray        += ld.baskets.gray || 0;
+      totals[l.id].hooks       += ld.baskets.hooks || 0;
+      if (ld.basketPayer) payersByLane[l.id].add(ld.basketPayer);
+      detailRows.push({ key: `${t.id}_${l.id}`, plate: t.plate, lane: l, baskets: ld.baskets, payer: ld.basketPayer, doneAt: ld.doneAt });
+    }
+  }
+  detailRows.sort((a, b) => (a.doneAt || "").localeCompare(b.doneAt || ""));
+  const filteredDetailRows = plateFilter.trim()
+    ? detailRows.filter(r => r.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase()))
+    : detailRows;
+
+  const ROWS = [
+    { key: "yellowBig",   label: "เหลือง (ใหญ่)" },
+    { key: "yellowSmall", label: "เหลือง (เล็ก)" },
+    { key: "gray",        label: "เทา" },
+    { key: "hooks",       label: "ตะขอแขวนซาก" },
+  ];
+  const laneTotal = (l) => totals[l.id].yellowBig + totals[l.id].yellowSmall + totals[l.id].gray;
+
+  const exportExcel = () => {
+    const summaryRows = [
+      ...ROWS.map(r => ({
+        "สีตะกร้า": r.label,
+        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, totals[l.id][r.key] || 0])),
+      })),
+      {
+        "สีตะกร้า": "รวมตะกร้า",
+        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, laneTotal(l)])),
+      },
+      {
+        "สีตะกร้า": "ผู้จ่าย",
+        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, [...payersByLane[l.id]].join(", ") || ""])),
+      },
+    ];
+    const detailRowsForExport = filteredDetailRows.map(r => ({
+      "ทะเบียน": r.plate,
+      "ลาน": r.lane.tinyLabel,
+      "เหลือง(ใหญ่)": r.baskets.yellowBig || 0,
+      "เหลือง(เล็ก)": r.baskets.yellowSmall || 0,
+      "เทา": r.baskets.gray || 0,
+      "ตะขอ": r.baskets.hooks || 0,
+      "ผู้จ่าย": r.payer || "",
+      "เวลา": r.doneAt || "",
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "สรุป");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRowsForExport), "รายละเอียด");
+    XLSX.writeFile(wb, `ตะกร้า_${date}.xlsx`);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22 }}>🧺 สรุปยอดตะกร้า/ตะขอ</h2>
+        <button onClick={exportExcel}
+          style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          Export Excel
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 20 }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+        <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }} />
+      </div>
+
+      {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
+
+      {!loadingArchive && <>
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 20 }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: "left" }}>สีตะกร้า</th>
+                {LOADING_LANES.map(l => <th key={l.id} style={{ ...th, color: l.color }}>{l.emoji} {l.tinyLabel}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map(r => (
+                <tr key={r.key}>
+                  <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.label}</td>
+                  {LOADING_LANES.map(l => <td key={l.id} style={td}>{totals[l.id][r.key] || 0}</td>)}
+                </tr>
+              ))}
+              <tr>
+                <td style={{ ...td, textAlign: "left", fontWeight: 800, background: "#f9fafb" }}>รวมตะกร้า</td>
+                {LOADING_LANES.map(l => <td key={l.id} style={{ ...td, fontWeight: 800, background: "#f9fafb" }}>{laneTotal(l)}</td>)}
+              </tr>
+              <tr>
+                <td style={{ ...td, textAlign: "left", fontWeight: 700, color: "#6b7280" }}>ผู้จ่าย</td>
+                {LOADING_LANES.map(l => <td key={l.id} style={{ ...td, fontSize: 12, color: "#6b7280" }}>{[...payersByLane[l.id]].join(", ") || "—"}</td>)}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+          📋 รายการต่อคันรถ <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{filteredDetailRows.length}</span>
+        </div>
+        {filteredDetailRows.length === 0
+          ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>{plateFilter.trim() ? `ไม่พบทะเบียน "${plateFilter}"` : "ยังไม่มีข้อมูลตะกร้าวันนี้"}</div>
+          : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>ทะเบียน</th>
+                    <th style={th}>ลาน</th>
+                    <th style={th}>เหลือง(ใหญ่)</th>
+                    <th style={th}>เหลือง(เล็ก)</th>
+                    <th style={th}>เทา</th>
+                    <th style={th}>ตะขอ</th>
+                    <th style={th}>ผู้จ่าย</th>
+                    <th style={th}>เวลา</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDetailRows.map(r => (
+                    <tr key={r.key}>
+                      <td style={{ ...td, fontWeight: 700 }}>{r.plate}</td>
+                      <td style={{ ...td, color: r.lane.color }}>{r.lane.tinyLabel}</td>
+                      <td style={td}>{r.baskets.yellowBig || 0}</td>
+                      <td style={td}>{r.baskets.yellowSmall || 0}</td>
+                      <td style={td}>{r.baskets.gray || 0}</td>
+                      <td style={td}>{r.baskets.hooks || 0}</td>
+                      <td style={td}>{r.payer || "—"}</td>
+                      <td style={td}>{r.doneAt || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
+      </>}
+    </div>
+  );
+};
+
+// ── 6.7 WAITING-FOR-PRODUCT SUMMARY (สรุปการรอสินค้า) ────────────────────────
+const WaitingSummary = ({ trucks }) => {
+  const isMobile = useIsMobile();
+  const today = cycleDateStr();
+  const [date, setDate] = useState(today);
+  const [plateFilter, setPlateFilter] = useState("");
+  const [archiveTrucks, setArchiveTrucks] = useState(null);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [nowMin, setNowMin] = useState(() => workTimeValue(TIME_NOW()));
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMin(workTimeValue(TIME_NOW())), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    setArchiveTrucks(null);
+    setLoadingArchive(date !== today);
+    supabase.from("wh_archive").select("trucks").eq("archive_date", date).single()
+      .then(({ data }) => setArchiveTrucks(data?.trucks ?? null))
+      .finally(() => setLoadingArchive(false));
+  }, [date, today]);
+
+  const sourceTrucks = archiveTrucks ?? (date === today ? trucks : []);
+
+  const th = { padding: "10px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", whiteSpace: "nowrap" };
+  const td = { padding: "10px 12px", textAlign: "center", borderBottom: "1px solid #f3f4f6" };
+  const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
+
+  // log of every wait period (ongoing or resolved) — loadLanes[lane] only keeps the
+  // latest waitingAt/waitingFor, so a truck that waited more than once per lane in a
+  // day only shows its most recent wait period here, not every one
+  const rows = [];
+  for (const t of sourceTrucks) {
+    for (const l of LOADING_LANES) {
+      const ld = t.loadLanes?.[l.id];
+      if (!ld?.waiting || !ld.waitingAt) continue;
+      const ongoing = !ld.done;
+      const endAt = ongoing ? null : ld.doneAt;
+      const durationMin = ongoing
+        ? Math.max(0, nowMin - workTimeValue(ld.waitingAt))
+        : (endAt ? Math.max(0, workTimeValue(endAt) - workTimeValue(ld.waitingAt)) : null);
+      rows.push({ key: `${t.id}_${l.id}`, plate: t.plate, customerGroup: t.customerGroup, lane: l, waitingFor: ld.waitingFor, startAt: ld.waitingAt, endAt, ongoing, durationMin });
+    }
+  }
+  rows.sort((a, b) => {
+    if (a.ongoing !== b.ongoing) return a.ongoing ? -1 : 1;
+    if (a.ongoing) return (b.durationMin ?? 0) - (a.durationMin ?? 0);
+    return workTimeValue(b.endAt || "00:00") - workTimeValue(a.endAt || "00:00");
+  });
+
+  const filtered = plateFilter.trim()
+    ? rows.filter(r => r.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase()))
+    : rows;
+
+  return (
+    <div>
+      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: 22 }}>⏳ สรุปการรอสินค้า</h2>
+
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+        <input type="text" placeholder="ค้นหาทะเบียนรถ" value={plateFilter} onChange={e => setPlateFilter(e.target.value)}
+          style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }} />
+      </div>
+
+      {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
+
+      {!loadingArchive && (
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+          🕓 ประวัติการรอสินค้า <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{filtered.length}</span>
+        </div>
+        {filtered.length === 0
+          ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>{plateFilter.trim() ? `ไม่พบทะเบียน "${plateFilter}"` : "ยังไม่มีการรอสินค้าวันนี้"}</div>
+          : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, textAlign: "left" }}>ทะเบียน</th>
+                    <th style={{ ...th, textAlign: "left" }}>กลุ่มลูกค้า</th>
+                    <th style={th}>ลาน</th>
+                    <th style={{ ...th, textAlign: "left" }}>สินค้าที่รอ</th>
+                    <th style={th}>ตั้งแต่</th>
+                    <th style={th}>ถึง</th>
+                    <th style={th}>ระยะเวลา</th>
+                    <th style={th}>สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(r => {
+                    const urgent = r.ongoing && (r.durationMin ?? 0) >= 20;
+                    return (
+                      <tr key={r.key} style={{ background: urgent ? "#fff5f5" : undefined }}>
+                        <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.plate}</td>
+                        <td style={{ ...td, textAlign: "left", color: "#6b7280" }}>{r.customerGroup || "—"}</td>
+                        <td style={{ ...td, color: r.lane.color, fontWeight: 700 }}>{r.lane.tinyLabel}</td>
+                        <td style={{ ...td, textAlign: "left" }}>{r.waitingFor || "—"}</td>
+                        <td style={td}>{r.startAt || "—"}</td>
+                        <td style={td}>{r.ongoing ? "—" : (r.endAt || "—")}</td>
+                        <td style={{ ...td, fontWeight: 700, color: urgent ? "#dc2626" : "#374151" }}>{r.durationMin != null ? `${r.durationMin} นาที` : "—"}</td>
+                        <td style={td}>
+                          {r.ongoing
+                            ? <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 0, padding: "3px 10px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>⏳ กำลังรอ</span>
+                            : <span style={{ background: "#d1fae5", color: "#065f46", borderRadius: 0, padding: "3px 10px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>✓ เสร็จแล้ว</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
+      )}
+    </div>
+  );
+};
 
 // ── 7. PLANNING ───────────────────────────────────────────────────────────────
 const Planning = ({ trucks, queue, onUpdate }) => {
@@ -2902,14 +3347,16 @@ const normalizeChannels = (customerGroup) => {
 
 // lanes a specific truck round needs, scoped to only the PO channel(s) its LG
 // "กลุ่มลูกค้า" says it's running — a plate that does 2 rounds for 2 different
-// customers in one day must not have both rounds' lanes merged together
+// customers in one day must not have both rounds' lanes merged together.
+// when กลุ่มลูกค้า is blank/unrecognized (no channel to scope to), fall back to
+// checking every channel — otherwise plates with no customerGroup set never match at all
 const laneMatchForTruck = (truck, detailMapByChannel) => {
-  const channels = normalizeChannels(truck?.customerGroup);
-  if (!channels.size) return new Set();
   const num = (String(truck?.plate).match(/\d+/g) || []).pop() || "";
   if (!num) return new Set();
+  const channels = normalizeChannels(truck?.customerGroup);
+  const searchChannels = channels.size ? [...channels] : Object.keys(detailMapByChannel);
   const lanes = new Set();
-  for (const ch of channels) {
+  for (const ch of searchChannels) {
     const map = detailMapByChannel[ch] || {};
     const matched = Object.entries(map).find(([k]) => (String(k).match(/\d+/g) || []).pop() === num);
     if (matched) matched[1].forEach(l => lanes.add(l));
@@ -3051,7 +3498,8 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
     reader.readAsArrayBuffer(file);
   };
 
-  // Parse master file (col A=index0=productCode, col D=index3=laneId)
+  // Parse master file — columns found by header name (ProductBKey=productCode, ลานโหลด=laneId, ProductNameTha=name)
+  // falls back to the old fixed positions (col B / col E) if a header isn't found, for older master files
   const parseMasterFile = (file) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -3059,11 +3507,19 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
         const wb = XLSX.read(ev.target.result, { type: "array", raw: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-        const dataRows = rows.slice(1).filter(r => r[0] && String(r[0]).trim() !== "" && String(r[0]).trim() !== "SAP");
+        const headerRow = rows[0] || [];
+        const findCol = (name) => headerRow.findIndex(h => String(h || "").trim().toLowerCase() === name.toLowerCase());
+        const nameColIdx = findCol("ProductNameTha");
+        const codeColIdx0 = findCol("ProductBKey");
+        const laneColIdx0 = findCol("ลานโหลด");
+        const codeColIdx = codeColIdx0 >= 0 ? codeColIdx0 : 1;
+        const laneColIdx = laneColIdx0 >= 0 ? laneColIdx0 : 4;
+        const dataRows = rows.slice(1).filter(r => r[codeColIdx] && String(r[codeColIdx]).trim() !== "" && String(r[codeColIdx]).trim() !== "SAP");
         const mapped = dataRows.map(r => ({
-          productCode: normalizeProductCode(r[0]),
-          laneKey:     normalizeLaneKey(r[3]),
-          rawCol3:     String(r[3] || "").trim(),
+          productCode: normalizeProductCode(r[codeColIdx]),
+          laneKey:     normalizeLaneKey(r[laneColIdx]),
+          rawCol3:     String(r[laneColIdx] || "").trim(),
+          productNameTha: nameColIdx >= 0 ? String(r[nameColIdx] || "").trim() : "",
         }));
         const parsed = mapped.filter(r => r.productCode && r.laneKey);
         setMasterDebug({
@@ -3779,6 +4235,7 @@ const ROLE_OPTIONS = [
   { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
   { id: "lg",          label: "LG",            emoji: "⬆️" },
   { id: "dashboard_only", label: "Dashboard" },
+  { id: "basket_summary", label: "สรุปยอดตะกร้า/ตะขอ" },
   { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
   { id: "tracking",    label: "Tracking การทำงาน",  emoji: "📊" },
   { id: "all",         label: "ทั้งหมด" },
@@ -3797,6 +4254,7 @@ const ROLE_TABS = {
   office_plan:  ["planning", "detail_loading"],
   lg:           ["lg"],
   dashboard_only: ["dashboard", "dashboard_transport"],
+  basket_summary: ["basket_summary"],
   loading_data: ["overview_log"],
   tracking:     ["work_tracking"],
   all:          null,
@@ -4088,6 +4546,8 @@ export default function App() {
     { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
+    { id: "basket_summary", label: "สรุปยอดตะกร้า/ตะขอ", icon: "clipboard" },
+    { id: "waiting_summary", label: "สรุปการรอสินค้า", icon: "clock" },
     { id: "overview_log",   label: "Log ภาพรวมการทำงาน",  icon: "list"  },
     { id: "work_tracking",  label: "Tracking การทำงาน",  icon: "chart" },
     { id: "planning",      label: "Invoice",       icon: "plan"      },
@@ -4187,7 +4647,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🥩" title="Checker ลานโหลดชิ้นส่วน" color="#c2410c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />
+          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} />
         </div>
       </div>
     );
@@ -4198,7 +4658,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🐷" title="Checker ลานโหลดหัว/เครื่องใน" color="#7c3aed" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />
+          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} />
         </div>
       </div>
     );
@@ -4209,7 +4669,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="🐖" title="Checker ลานโหลดหมูซีก" color="#be123c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
-          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />
+          <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} />
         </div>
       </div>
     );
@@ -4293,6 +4753,8 @@ export default function App() {
       <div style={{ maxWidth: tab === "dashboard" || tab === "dashboard_transport" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" || tab === "dashboard_transport" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} myPlate={myPlate} />}
         {tab === "dashboard_transport" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} />}
+        {tab === "basket_summary" && <BasketSummary trucks={trucks} />}
+        {tab === "waiting_summary" && <WaitingSummary trucks={trucks} />}
         {tab === "qr"        && <QRCodePage />}
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
@@ -4300,9 +4762,9 @@ export default function App() {
         {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
         {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
         {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
-        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" />}
-        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" />}
-        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" />}
+        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} />}
+        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} />}
+        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} />}
         {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
         {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
         {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
