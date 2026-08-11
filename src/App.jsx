@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 const useIsMobile = () => {
   const [v, setV] = useState(() => window.innerWidth < 768);
@@ -3541,16 +3541,26 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   };
 
   // Compute plate → lanes mapping from all sources + master
-  const plateLaneMap = {};
-  const allDetail = [...(srcData.wet_market || []), ...(srcData.modern_trade || []), ...(srcData.others || [])];
-  for (const row of allDetail) {
-    const rowCode = normalizeProductCode(row.productCode);
-    const match = (masterLane || []).find(m => normalizeProductCode(m.productCode) === rowCode);
-    if (!match) continue;
-    const plateKey = String(row.plate).replace(/\s/g, "").toUpperCase();
-    if (!plateLaneMap[plateKey]) plateLaneMap[plateKey] = new Set();
-    plateLaneMap[plateKey].add(match.laneKey);
-  }
+  // memoized: this is an O(rows × masterLane) nested scan (thousands × ~350), and
+  // without useMemo it re-ran on every render — including the app's own 15s clock
+  // tick re-rendering whichever tab is active — which is what made this page feel
+  // stuck compared to others
+  const allDetail = useMemo(
+    () => [...(srcData.wet_market || []), ...(srcData.modern_trade || []), ...(srcData.others || [])],
+    [srcData]
+  );
+  const plateLaneMap = useMemo(() => {
+    const map = {};
+    for (const row of allDetail) {
+      const rowCode = normalizeProductCode(row.productCode);
+      const match = (masterLane || []).find(m => normalizeProductCode(m.productCode) === rowCode);
+      if (!match) continue;
+      const plateKey = String(row.plate).replace(/\s/g, "").toUpperCase();
+      if (!map[plateKey]) map[plateKey] = new Set();
+      map[plateKey].add(match.laneKey);
+    }
+    return map;
+  }, [allDetail, masterLane]);
 
   return (
     <div style={{ padding: 20 }}>
