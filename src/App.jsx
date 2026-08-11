@@ -2573,7 +2573,7 @@ const BasketSummary = ({ trucks }) => {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22 }}>🧺 สรุปยอดตะกร้า/ตะขอ</h2>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22 }}>🧺 ข้อมูลยอดตะกร้า/ตะขอ</h2>
         <button onClick={exportExcel}
           style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
           Export Excel
@@ -2662,7 +2662,7 @@ const BasketSummary = ({ trucks }) => {
   );
 };
 
-// ── 6.7 WAITING-FOR-PRODUCT SUMMARY (สรุปการรอสินค้า) ────────────────────────
+// ── 6.7 WAITING-FOR-PRODUCT SUMMARY (ข้อมูลการรอสินค้า) ────────────────────────
 const WaitingSummary = ({ trucks }) => {
   const isMobile = useIsMobile();
   const today = cycleDateStr();
@@ -2719,7 +2719,7 @@ const WaitingSummary = ({ trucks }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: 22 }}>⏳ สรุปการรอสินค้า</h2>
+      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: 22 }}>⏳ ข้อมูลการรอสินค้า</h2>
 
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
@@ -4245,7 +4245,7 @@ const ROLE_OPTIONS = [
   { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
   { id: "lg",          label: "LG",            emoji: "⬆️" },
   { id: "dashboard_only", label: "Dashboard" },
-  { id: "basket_summary", label: "สรุปยอดตะกร้า/ตะขอ" },
+  { id: "basket_summary", label: "ข้อมูลยอดตะกร้า/ตะขอ" },
   { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
   { id: "tracking",    label: "Tracking การทำงาน",  emoji: "📊" },
   { id: "all",         label: "ทั้งหมด" },
@@ -4556,8 +4556,8 @@ export default function App() {
     { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
     { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
     { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
-    { id: "basket_summary", label: "สรุปยอดตะกร้า/ตะขอ", icon: "clipboard" },
-    { id: "waiting_summary", label: "สรุปการรอสินค้า", icon: "clock" },
+    { id: "basket_summary", label: "ข้อมูลยอดตะกร้า/ตะขอ", icon: "clipboard" },
+    { id: "waiting_summary", label: "ข้อมูลการรอสินค้า", icon: "clock" },
     { id: "overview_log",   label: "Log ภาพรวมการทำงาน",  icon: "list"  },
     { id: "work_tracking",  label: "Tracking การทำงาน",  icon: "chart" },
     { id: "planning",      label: "Invoice",       icon: "plan"      },
