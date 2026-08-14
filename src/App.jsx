@@ -313,6 +313,7 @@ const Icon = ({ name, size = 20 }) => {
     truck:     <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
     scan:      <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 12h10"/></svg>,
     upload:    <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
+    download:  <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 3v12"/></svg>,
     clipboard: <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>,
     camera:    <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
     check:     <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>,
@@ -2009,6 +2010,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const form    = forms[activeLane];
   const setBasket = (key, val) => setF(activeLane, { baskets: { ...form.baskets, [key]: val } });
   const basketTotal = ["yellowBig", "yellowSmall", "gray"].reduce((sum, k) => sum + (Number(form.baskets?.[k]) || 0), 0);
+  const [basketsOpen, setBasketsOpen] = useState(false);
   const [waitingModal, setWaitingModal] = useState(false);
   const [waitingReasons, setWaitingReasons] = useState([""]);
   const MAX_WAITING_REASONS = 3;
@@ -2151,41 +2153,49 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
         <PhotoUploader label="📷 ถ่ายรูปหลังโหลดเสร็จ" value={form.photo} onChange={handlePhoto(activeLane)} onRemove={photos => setF(activeLane, { photo: photos })} />
 
         <div style={{ marginTop: 4, marginBottom: 12 }}>
-          <div style={{ fontWeight: 800, fontSize: 13, color: "#374151", marginBottom: 8 }}>🧺 ยอดตะกร้า / ตะขอ</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (ใหญ่)</label>
-              <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowBig ?? ""} onChange={e => setBasket("yellowBig", e.target.value)}
-                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (เล็ก)</label>
-              <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowSmall ?? ""} onChange={e => setBasket("yellowSmall", e.target.value)}
-                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เทา</label>
-              <input type="number" min="0" inputMode="numeric" value={form.baskets?.gray ?? ""} onChange={e => setBasket("gray", e.target.value)}
-                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-            </div>
+          <div onClick={() => setBasketsOpen(o => !o)}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontWeight: 800, fontSize: 13, color: "#374151", marginBottom: basketsOpen ? 8 : 0, cursor: "pointer" }}>
+            <span>🧺 ยอดตะกร้า / ตะขอ <span style={{ fontWeight: 400, color: "#9ca3af" }}>(Optional)</span></span>
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>{basketsOpen ? "▲" : "▼"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตะขอแขวนซาก</label>
-              <input type="number" min="0" inputMode="numeric" value={form.baskets?.hooks ?? ""} onChange={e => setBasket("hooks", e.target.value)}
-                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>รวมตะกร้า</label>
-              <div style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, color: curLane.color, background: "#fff", border: `1.5px solid ${curLane.border}`, boxSizing: "border-box" }}>{basketTotal}</div>
-            </div>
-          </div>
-          <input
-            placeholder="ชื่อผู้จ่ายตะกร้า"
-            value={form.baskets?.payer ?? ""}
-            onChange={e => setBasket("payer", e.target.value)}
-            style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "9px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
-          />
+          {basketsOpen && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (ใหญ่)</label>
+                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowBig ?? ""} onChange={e => setBasket("yellowBig", e.target.value)}
+                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (เล็ก)</label>
+                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowSmall ?? ""} onChange={e => setBasket("yellowSmall", e.target.value)}
+                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เทา</label>
+                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.gray ?? ""} onChange={e => setBasket("gray", e.target.value)}
+                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตะขอแขวนซาก</label>
+                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.hooks ?? ""} onChange={e => setBasket("hooks", e.target.value)}
+                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>รวมตะกร้า</label>
+                  <div style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, color: curLane.color, background: "#fff", border: `1.5px solid ${curLane.border}`, boxSizing: "border-box" }}>{basketTotal}</div>
+                </div>
+              </div>
+              <input
+                placeholder="ชื่อผู้จ่ายตะกร้า"
+                value={form.baskets?.payer ?? ""}
+                onChange={e => setBasket("payer", e.target.value)}
+                style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "9px 10px", fontSize: 13, outline: "none", boxSizing: "border-box" }}
+              />
+            </>
+          )}
         </div>
 
         <button onClick={openWaitingModal} disabled={!sel || form.uploading}
@@ -2505,6 +2515,100 @@ const BasketSummary = ({ trucks }) => {
 
   const sourceTrucks = archiveTrucks ?? (date === today ? trucks : []);
 
+  // ── การคืนตะกร้า (สะสมข้ามวัน ไม่ล้างตอนปิดงาน) ──
+  const emptyReturnForm = () => ({ plate: "", yellowBig: "", yellowSmall: "", gray: "", hooks: "" });
+  const [allArchiveTrucks, setAllArchiveTrucks] = useState([]);
+  const [returns, setReturns] = useState([]);
+  const [returnForm, setReturnForm] = useState(emptyReturnForm());
+  const [savingReturn, setSavingReturn] = useState(false);
+
+  const fetchReturns = () => {
+    supabase.from("wh_basket_returns").select("data").then(({ data }) => setReturns((data || []).map(r => r.data)));
+  };
+
+  useEffect(() => {
+    supabase.from("wh_archive").select("trucks").then(({ data }) => setAllArchiveTrucks((data || []).map(r => r.trucks || [])));
+    fetchReturns();
+  }, []);
+
+  // ตัดตัวอักษร/ขีด/เว้นวรรคออก เหลือแค่ตัวเลข — กันแยกยอดผิดคันเวลาพิมพ์ทะเบียนต่างรูปแบบ
+  // (เช่น "1กข-1234" vs "1กข 1234") ใช้ key เดียวกับที่หน้าอื่นในแอปนี้ใช้จับคู่ทะเบียนกันอยู่แล้ว
+  const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
+
+  // ยอดออกสะสมทุกวัน (archive ทั้งหมด + คิววันนี้ที่ยังไม่ปิดงาน) แยกตามทะเบียนรถ
+  const issuedByPlate = {};
+  for (const t of [...allArchiveTrucks.flat(), ...trucks]) {
+    if (!t?.plate) continue;
+    const key = plateNum(t.plate);
+    if (!key) continue;
+    for (const l of LOADING_LANES) {
+      const ld = t.loadLanes?.[l.id];
+      if (!ld?.baskets) continue;
+      const cur = issuedByPlate[key] || { plate: t.plate, yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
+      cur.yellowBig   += ld.baskets.yellowBig   || 0;
+      cur.yellowSmall += ld.baskets.yellowSmall || 0;
+      cur.gray        += ld.baskets.gray        || 0;
+      cur.hooks       += ld.baskets.hooks       || 0;
+      issuedByPlate[key] = cur;
+    }
+  }
+
+  // ยอดคืนสะสม แยกตามทะเบียนรถ
+  const returnedByPlate = {};
+  for (const r of returns) {
+    if (!r?.plate) continue;
+    const key = plateNum(r.plate);
+    if (!key) continue;
+    const cur = returnedByPlate[key] || { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
+    cur.yellowBig   += r.yellowBig   || 0;
+    cur.yellowSmall += r.yellowSmall || 0;
+    cur.gray        += r.gray        || 0;
+    cur.hooks       += r.hooks       || 0;
+    returnedByPlate[key] = cur;
+  }
+
+  const outstandingRows = Object.keys(issuedByPlate).map(key => {
+    const issued = issuedByPlate[key];
+    const plate = issued.plate;
+    const returned = returnedByPlate[key] || { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
+    const out = {
+      yellowBig:   issued.yellowBig   - returned.yellowBig,
+      yellowSmall: issued.yellowSmall - returned.yellowSmall,
+      gray:        issued.gray        - returned.gray,
+      hooks:       issued.hooks       - returned.hooks,
+    };
+    return { plate, out, total: out.yellowBig + out.yellowSmall + out.gray + out.hooks };
+  }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
+
+  const outstandingGrandTotal = outstandingRows.reduce((sum, r) => sum + r.total, 0);
+
+  const submitReturn = async () => {
+    const plate = returnForm.plate.trim();
+    if (!plate) { alert("กรุณากรอกทะเบียนรถ"); return; }
+    const counts = {
+      yellowBig:   Number(returnForm.yellowBig)   || 0,
+      yellowSmall: Number(returnForm.yellowSmall) || 0,
+      gray:        Number(returnForm.gray)        || 0,
+      hooks:       Number(returnForm.hooks)       || 0,
+    };
+    if (!counts.yellowBig && !counts.yellowSmall && !counts.gray && !counts.hooks) {
+      alert("กรุณากรอกจำนวนตะกร้า/ตะขอที่คืนอย่างน้อย 1 ช่อง");
+      return;
+    }
+    setSavingReturn(true);
+    try {
+      const id = `return_${plate}_${Date.now()}`;
+      const { error } = await supabase.from("wh_basket_returns").insert({ id, data: { plate, ...counts, returnedAt: new Date().toISOString() } });
+      if (error) throw error;
+      setReturnForm(emptyReturnForm());
+      fetchReturns();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setSavingReturn(false);
+    }
+  };
+
   const th = { padding: "10px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", whiteSpace: "nowrap" };
   const td = { padding: "10px 12px", textAlign: "center", borderBottom: "1px solid #f3f4f6" };
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
@@ -2539,6 +2643,7 @@ const BasketSummary = ({ trucks }) => {
   ];
   const laneTotal = (l) => totals[l.id].yellowBig + totals[l.id].yellowSmall + totals[l.id].gray;
 
+
   const exportExcel = () => {
     const summaryRows = [
       ...ROWS.map(r => ({
@@ -2564,9 +2669,18 @@ const BasketSummary = ({ trucks }) => {
       "ผู้จ่าย": r.payer || "",
       "เวลา": r.doneAt || "",
     }));
+    const outstandingForExport = outstandingRows.map(r => ({
+      "ทะเบียน": r.plate,
+      "เหลือง(ใหญ่)": r.out.yellowBig,
+      "เหลือง(เล็ก)": r.out.yellowSmall,
+      "เทา": r.out.gray,
+      "ตะขอ": r.out.hooks,
+      "รวมค้างคืน": r.total,
+    }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "สรุป");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRowsForExport), "รายละเอียด");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(outstandingForExport), "ค้างคืน");
     XLSX.writeFile(wb, `ตะกร้า_${date}.xlsx`);
   };
 
@@ -2588,6 +2702,43 @@ const BasketSummary = ({ trucks }) => {
       {loadingArchive && <div style={{ textAlign: "center", color: "#9ca3af", padding: 30 }}>กำลังโหลด...</div>}
 
       {!loadingArchive && <>
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 20 }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+          🔄 บันทึกการคืนตะกร้า/ตะขอ
+        </div>
+        <div style={{ padding: 16 }}>
+          <input
+            list="basketReturnPlates"
+            placeholder="ทะเบียนรถ"
+            value={returnForm.plate}
+            onChange={e => setReturnForm(f => ({ ...f, plate: e.target.value }))}
+            style={{ ...inp, width: "100%", marginBottom: 8 }}
+          />
+          <datalist id="basketReturnPlates">
+            {Object.values(issuedByPlate).map(v => <option key={v.plate} value={v.plate} />)}
+          </datalist>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+            {[
+              { key: "yellowBig",   label: "เหลือง (ใหญ่)" },
+              { key: "yellowSmall", label: "เหลือง (เล็ก)" },
+              { key: "gray",        label: "เทา" },
+              { key: "hooks",       label: "ตะขอแขวนซาก" },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{f.label}</label>
+                <input type="number" min="0" inputMode="numeric" value={returnForm[f.key]}
+                  onChange={e => setReturnForm(fm => ({ ...fm, [f.key]: e.target.value }))}
+                  style={{ ...inp, width: "100%" }} />
+              </div>
+            ))}
+          </div>
+          <button onClick={submitReturn} disabled={savingReturn}
+            style={{ width: "100%", background: savingReturn ? "#e5e7eb" : "#16a34a", color: savingReturn ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontWeight: 700, fontSize: 14, cursor: savingReturn ? "default" : "pointer" }}>
+            {savingReturn ? "⏳ กำลังบันทึก..." : "✅ บันทึกคืนตะกร้า"}
+          </button>
+        </div>
+      </div>
+
       <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 20 }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -2657,6 +2808,48 @@ const BasketSummary = ({ trucks }) => {
           )
         }
       </div>
+
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginTop: 20 }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+          📦 ตะกร้าค้างคืน (สะสมทุกวัน) <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{outstandingRows.length}</span>
+        </div>
+        {outstandingRows.length === 0
+          ? <div style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>ไม่มีตะกร้า/ตะขอค้างคืน</div>
+          : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, textAlign: "left" }}>ทะเบียน</th>
+                    <th style={th}>เหลือง(ใหญ่)</th>
+                    <th style={th}>เหลือง(เล็ก)</th>
+                    <th style={th}>เทา</th>
+                    <th style={th}>ตะขอ</th>
+                    <th style={th}>รวมค้างคืน</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {outstandingRows.map(r => (
+                    <tr key={r.plate}>
+                      <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.plate}</td>
+                      <td style={td}>{r.out.yellowBig}</td>
+                      <td style={td}>{r.out.yellowSmall}</td>
+                      <td style={td}>{r.out.gray}</td>
+                      <td style={td}>{r.out.hooks}</td>
+                      <td style={{ ...td, fontWeight: 800, color: "#dc2626" }}>{r.total}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td style={{ ...td, textAlign: "left", fontWeight: 800, background: "#f9fafb" }}>รวมทั้งหมด</td>
+                    <td style={{ ...td, fontWeight: 800, background: "#f9fafb" }} colSpan={4}></td>
+                    <td style={{ ...td, fontWeight: 800, background: "#f9fafb", color: "#dc2626" }}>{outstandingGrandTotal}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
       </>}
     </div>
   );
@@ -2717,9 +2910,31 @@ const WaitingSummary = ({ trucks }) => {
     ? rows.filter(r => r.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase()))
     : rows;
 
+  const exportExcel = () => {
+    const rowsForExport = filtered.map(r => ({
+      "ทะเบียน": r.plate,
+      "กลุ่มลูกค้า": r.customerGroup || "",
+      "ลาน": r.lane.tinyLabel,
+      "สินค้าที่รอ": r.waitingFor || "",
+      "ตั้งแต่": r.startAt || "",
+      "ถึง": r.ongoing ? "" : (r.endAt || ""),
+      "ระยะเวลา (นาที)": r.durationMin ?? "",
+      "สถานะ": r.ongoing ? "กำลังรอ" : "เสร็จแล้ว",
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsForExport), "รอสินค้า");
+    XLSX.writeFile(wb, `รอสินค้า_${date}.xlsx`);
+  };
+
   return (
     <div>
-      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: 22 }}>⏳ ข้อมูลการรอสินค้า</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22 }}>⏳ ข้อมูลการรอสินค้า</h2>
+        <button onClick={exportExcel}
+          style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          Export Excel
+        </button>
+      </div>
 
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 16 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
@@ -2762,7 +2977,7 @@ const WaitingSummary = ({ trucks }) => {
                         <td style={{ ...td, textAlign: "left" }}>{r.waitingFor || "—"}</td>
                         <td style={td}>{r.startAt || "—"}</td>
                         <td style={td}>{r.ongoing ? "—" : (r.endAt || "—")}</td>
-                        <td style={{ ...td, fontWeight: 700, color: urgent ? "#dc2626" : "#374151" }}>{r.durationMin != null ? `${r.durationMin} นาที` : "—"}</td>
+                        <td style={{ ...td, fontWeight: 700, color: urgent ? "#dc2626" : "#374151" }}>{r.durationMin != null ? formatMinsDelta(r.durationMin) : "—"}</td>
                         <td style={td}>
                           {r.ongoing
                             ? <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 0, padding: "3px 10px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>⏳ กำลังรอ</span>
@@ -3366,7 +3581,7 @@ const laneMatchForTruck = (truck, detailMapByChannel) => {
 
 const DETAIL_LS_VER = "v2"; // bump when encoding/format changes — forces re-upload
 
-const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
+const DetailLoading = ({ masterLane, onDetailChange }) => {
   const initSrc = () => {
     try {
       if (localStorage.getItem("wh_detail_ver") !== DETAIL_LS_VER) {
@@ -3384,7 +3599,6 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
   const [srcData,     setSrcData]     = useState(() => ({ wet_market: [], modern_trade: [], others: [], ...initSrc() }));
   const [fileNames,   setFileNames]   = useState(initNames);
   const [showDebug,   setShowDebug]   = useState(false);
-  const [masterDebug, setMasterDebug] = useState(null); // { total, parsed, sampleCol3 }
 
   // On mount: fetch from Supabase (shared), fallback to localStorage
   useEffect(() => {
@@ -3498,48 +3712,6 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
     reader.readAsArrayBuffer(file);
   };
 
-  // Parse master file — columns found by header name (ProductBKey=productCode, ลานโหลด=laneId, ProductNameTha=name)
-  // falls back to the old fixed positions (col B / col E) if a header isn't found, for older master files
-  const parseMasterFile = (file) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const wb = XLSX.read(ev.target.result, { type: "array", raw: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-        const headerRow = rows[0] || [];
-        const findCol = (name) => headerRow.findIndex(h => String(h || "").trim().toLowerCase() === name.toLowerCase());
-        const nameColIdx = findCol("ProductNameTha");
-        const codeColIdx0 = findCol("ProductBKey");
-        const laneColIdx0 = findCol("ลานโหลด");
-        const codeColIdx = codeColIdx0 >= 0 ? codeColIdx0 : 1;
-        const laneColIdx = laneColIdx0 >= 0 ? laneColIdx0 : 4;
-        const dataRows = rows.slice(1).filter(r => r[codeColIdx] && String(r[codeColIdx]).trim() !== "" && String(r[codeColIdx]).trim() !== "SAP");
-        const mapped = dataRows.map(r => ({
-          productCode: normalizeProductCode(r[codeColIdx]),
-          laneKey:     normalizeLaneKey(r[laneColIdx]),
-          rawCol3:     String(r[laneColIdx] || "").trim(),
-          productNameTha: nameColIdx >= 0 ? String(r[nameColIdx] || "").trim() : "",
-        }));
-        const parsed = mapped.filter(r => r.productCode && r.laneKey);
-        setMasterDebug({
-          total:    dataRows.length,
-          matched:  parsed.length,
-          sampleCol3: [...new Set(mapped.map(r => r.rawCol3))].slice(0, 6),
-        });
-        setFileNames(prev => {
-          const next = { ...prev, master: file.name };
-          localStorage.setItem("wh_detail_names", JSON.stringify(next));
-          return next;
-        });
-        onMasterChange(parsed);
-      } catch(e) {
-        alert("อ่านไฟล์ Master ไม่สำเร็จ: " + e.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   // Compute plate → lanes mapping from all sources + master
   // memoized: this is an O(rows × masterLane) nested scan (thousands × ~350), and
   // without useMemo it re-ran on every render — including the app's own 15s clock
@@ -3590,35 +3762,6 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
             </label>
           </div>
         ))}
-
-        {/* Master button (4) - persistent */}
-        <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20, border: "2px solid #111" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <span style={{ fontSize: 28 }}>🗂️</span>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Master ลานโหลด</div>
-              {fileNames.master && (
-                <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
-                  ✅ {fileNames.master}
-                </div>
-              )}
-            </div>
-          </div>
-          <label style={{ display: "block", background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", textAlign: "center", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" }}
-            onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
-            onMouseOut={e => e.currentTarget.style.opacity = "1"}>
-            {fileNames.master ? "🔄 เปลี่ยน Master" : "⬆️ อัปโหลด Master"}
-            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
-              onChange={e => { if (e.target.files[0]) parseMasterFile(e.target.files[0]); e.target.value = ""; }} />
-          </label>
-          {masterDebug && (
-            <div style={{ marginTop: 10, fontSize: 11, padding: "8px 10px", borderRadius: 0, background: masterDebug.matched === 0 ? "#fee2e2" : "#d1fae5", color: masterDebug.matched === 0 ? "#991b1b" : "#065f46" }}>
-              {masterDebug.matched === 0
-                ? <>❌ Match 0/{masterDebug.total} — ค่าใน col D: {masterDebug.sampleCol3.map(v => `"${v}"`).join(", ")}</>
-                : <>✅ Match {masterDebug.matched}/{masterDebug.total} รหัส</>}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Result table: plate → lanes */}
@@ -3695,9 +3838,206 @@ const DetailLoading = ({ masterLane, onMasterChange, onDetailChange }) => {
 
       {(masterLane || []).length === 0 && (
         <div style={{ background: "#f9fafb", border: "1.5px dashed #d1d5db", borderRadius: 0, padding: 20, color: "#9ca3af", fontWeight: 600, fontSize: 14, textAlign: "center" }}>
-          🗂️ กรุณาอัปโหลดไฟล์ Master ลานโหลดก่อน
+          🗂️ กรุณาอัปโหลดไฟล์ Master ลานโหลดก่อน (เมนู "อัพโหลด Master")
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── MASTER UPLOAD (แยกออกมาจาก Detail Loading ให้มีหน้าของตัวเอง) ──────────
+const MasterUpload = ({ masterLane, onMasterChange }) => {
+  const [fileName, setFileName] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wh_detail_names") || "{}").master || ""; } catch { return ""; }
+  });
+  const [masterDebug, setMasterDebug] = useState(null); // { total, matched, sampleCol3 }
+  const [uploadLog, setUploadLog] = useState([]);
+
+  useEffect(() => {
+    supabase.from("wh_master_upload_log").select("id, data").then(({ data }) => {
+      const fetched = (data || []).map(r => ({ id: r.id, ...r.data }));
+      // merge instead of overwrite — an optimistic entry from an upload that happens
+      // before this fetch resolves would otherwise get silently wiped off the list
+      setUploadLog(prev => {
+        const merged = [...fetched];
+        for (const p of prev) {
+          if (!merged.some(m => m.fileName === p.fileName && m.uploadedAt === p.uploadedAt)) merged.push(p);
+        }
+        return merged.sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || ""));
+      });
+    });
+  }, []);
+
+  // Parse master file — columns found by header name (ProductBKey=productCode, ลานโหลด=laneId, ProductNameTha=name)
+  // falls back to the old fixed positions (col B / col E) if a header isn't found, for older master files
+  const parseMasterFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: "array", raw: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
+        const headerRow = rows[0] || [];
+        const findCol = (name) => headerRow.findIndex(h => String(h || "").trim().toLowerCase() === name.toLowerCase());
+        const nameColIdx = findCol("ProductNameTha");
+        const codeColIdx0 = findCol("ProductBKey");
+        const laneColIdx0 = findCol("ลานโหลด");
+        const codeColIdx = codeColIdx0 >= 0 ? codeColIdx0 : 1;
+        const laneColIdx = laneColIdx0 >= 0 ? laneColIdx0 : 4;
+        const dataRows = rows.slice(1).filter(r => r[codeColIdx] && String(r[codeColIdx]).trim() !== "" && String(r[codeColIdx]).trim() !== "SAP");
+        const mapped = dataRows.map(r => ({
+          productCode: normalizeProductCode(r[codeColIdx]),
+          laneKey:     normalizeLaneKey(r[laneColIdx]),
+          rawCol3:     String(r[laneColIdx] || "").trim(),
+          productNameTha: nameColIdx >= 0 ? String(r[nameColIdx] || "").trim() : "",
+        }));
+        const parsed = mapped.filter(r => r.productCode && r.laneKey);
+        setMasterDebug({
+          total:    dataRows.length,
+          matched:  parsed.length,
+          sampleCol3: [...new Set(mapped.map(r => r.rawCol3))].slice(0, 6),
+        });
+        setFileName(file.name);
+        try {
+          const names = JSON.parse(localStorage.getItem("wh_detail_names") || "{}");
+          localStorage.setItem("wh_detail_names", JSON.stringify({ ...names, master: file.name }));
+        } catch {}
+        onMasterChange(parsed);
+
+        const uploadId = `upload_${Date.now()}`;
+        const logEntry = { id: uploadId, fileName: file.name, uploadedAt: new Date().toISOString(), matched: parsed.length, total: dataRows.length, rows: parsed };
+        setUploadLog(prev => [logEntry, ...prev]);
+        supabase.from("wh_master_upload_log").insert({ id: uploadId, data: logEntry })
+          .then(({ error }) => {
+            if (error) {
+              console.error("บันทึกประวัติการอัพโหลดไม่สำเร็จ:", error);
+              // roll back the optimistic row — otherwise it looks saved until the next reload silently drops it
+              setUploadLog(prev => prev.filter(h => h.id !== uploadId));
+              alert("อัปโหลด Master สำเร็จ แต่บันทึกประวัติการอัพโหลดไม่สำเร็จ: " + error.message);
+            }
+          });
+      } catch(e) {
+        alert("อ่านไฟล์ Master ไม่สำเร็จ: " + e.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const downloadRows = (rows, fileSuffix) => {
+    const sheetRows = (rows || []).map(m => ({
+      "ProductBKey":    m.productCode,
+      "ลานโหลด":        m.rawCol3 || m.laneKey,
+      "ProductNameTha": m.productNameTha || "",
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetRows), "Master");
+    XLSX.writeFile(wb, `master_${fileSuffix}.xlsx`);
+  };
+
+  const deleteUploadLogEntry = async (entry, index) => {
+    if (!window.confirm(`ลบประวัติ "${entry.fileName}" ออกจากรายการ?`)) return;
+    setUploadLog(prev => prev.filter((_, i) => i !== index));
+    if (entry.id) {
+      const { error } = await supabase.from("wh_master_upload_log").delete().eq("id", entry.id);
+      if (error) alert("ลบไม่สำเร็จ: " + error.message);
+    }
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 900 }}>🗂️ อัพโหลด Master</h2>
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20, border: "2px solid #111", flex: 1, minWidth: 320 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 28 }}>🗂️</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Master ลานโหลด</div>
+            {fileName && (
+              <div style={{ fontSize: 11, color: "#111", fontWeight: 700, marginTop: 2 }}>
+                ✅ {fileName}
+              </div>
+            )}
+          </div>
+        </div>
+        <label style={{ display: "block", background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", textAlign: "center", fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "opacity 0.2s" }}
+          onMouseOver={e => e.currentTarget.style.opacity = "0.8"}
+          onMouseOut={e => e.currentTarget.style.opacity = "1"}>
+          {fileName ? "🔄 เปลี่ยน Master" : "⬆️ อัปโหลด Master"}
+          <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+            onChange={e => { if (e.target.files[0]) parseMasterFile(e.target.files[0]); e.target.value = ""; }} />
+        </label>
+        {masterDebug && (
+          <div style={{ marginTop: 10, fontSize: 11, padding: "8px 10px", borderRadius: 0, background: masterDebug.matched === 0 ? "#fee2e2" : "#d1fae5", color: masterDebug.matched === 0 ? "#991b1b" : "#065f46" }}>
+            {masterDebug.matched === 0
+              ? <>❌ Match 0/{masterDebug.total} — ค่าใน col D: {masterDebug.sampleCol3.map(v => `"${v}"`).join(", ")}</>
+              : <>✅ Match {masterDebug.matched}/{masterDebug.total} รหัส</>}
+          </div>
+        )}
+        {(masterLane || []).length > 0 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
+            มีข้อมูล Master อยู่แล้ว {masterLane.length.toLocaleString()} รายการ
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", flex: 1, minWidth: 320 }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+          🕓 ประวัติการอัพโหลด <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{uploadLog.length}</span>
+        </div>
+        {uploadLog.length === 0
+          ? <div style={{ padding: 30, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>ยังไม่มีประวัติการอัพโหลด</div>
+          : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb" }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>ไฟล์</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>วันที่/เวลา</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb" }}></th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>Match</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {uploadLog.map((h, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "8px 12px" }}>{h.fileName}</td>
+                      <td style={{ padding: "8px 12px", whiteSpace: "nowrap", color: "#6b7280" }}>
+                        {h.uploadedAt ? new Date(h.uploadedAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                        {h.rows && h.rows.length > 0 ? (
+                          <button onClick={() => downloadRows(h.rows, h.uploadedAt ? h.uploadedAt.slice(0, 10) : String(i))}
+                            title="ดาวน์โหลดไฟล์นี้"
+                            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#6b7280", display: "inline-flex" }}>
+                            <Icon name="download" size={16} />
+                          </button>
+                        ) : (
+                          <span style={{ color: "#e5e7eb" }} title="ไม่มีข้อมูลให้ดาวน์โหลด">
+                            <Icon name="download" size={16} />
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", color: h.matched === 0 ? "#dc2626" : "#065f46", fontWeight: 700 }}>
+                        {h.matched}/{h.total}
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                        <button onClick={() => deleteUploadLogEntry(h, i)}
+                          title="ลบประวัตินี้"
+                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 14 }}>
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
+      </div>
     </div>
   );
 };
@@ -4245,7 +4585,6 @@ const ROLE_OPTIONS = [
   { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
   { id: "lg",          label: "LG",            emoji: "⬆️" },
   { id: "dashboard_only", label: "Dashboard" },
-  { id: "basket_summary", label: "ข้อมูลยอดตะกร้า/ตะขอ" },
   { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
   { id: "tracking",    label: "Tracking การทำงาน",  emoji: "📊" },
   { id: "all",         label: "ทั้งหมด" },
@@ -4258,13 +4597,12 @@ const LANE_SELECT_ROLES = ["qc", "loading", "checker", "office_wh", "office_plan
 
 const ROLE_TABS = {
   qc:           ["qc_parts", "qc_head", "qc_pork"],
-  loading:      LOADING_TABS,
+  loading:      [...LOADING_TABS, "master_upload"],
   checker:      ["sample_parts", "sample_head", "sample_pork"],
   office_wh:    ["picking"],
-  office_plan:  ["planning", "detail_loading"],
+  office_plan:  ["planning", "master_upload", "detail_loading"],
   lg:           ["lg"],
   dashboard_only: ["dashboard", "dashboard_transport"],
-  basket_summary: ["basket_summary"],
   loading_data: ["overview_log"],
   tracking:     ["work_tracking"],
   all:          null,
@@ -4564,6 +4902,7 @@ export default function App() {
     { id: "detail_loading", label: "อัพโหลด PO", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
     { id: "admin",          label: "Admin",          icon: "plan"      },
+    { id: "master_upload", label: "อัพโหลด Master", icon: "clipboard" },
     { id: "qr",             label: "QR Code",       icon: "scan"      },
   ];
 
@@ -4781,7 +5120,8 @@ export default function App() {
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
         {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} detailMapByChannel={detailMapByChannel} masterLane={masterLane} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
-        {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onMasterChange={handleMasterChange} onDetailChange={handleDetailChange} />}
+        {tab === "master_upload" && <MasterUpload masterLane={masterLane} onMasterChange={handleMasterChange} />}
+        {tab === "detail_loading" && <DetailLoading masterLane={masterLane} onDetailChange={handleDetailChange} />}
         {tab === "download"       && <Download onReset={handleReset} />}
         {tab === "admin"          && <Admin trucks={trucks} queue={queue} onUpdate={handleUpdate} onDeleteTruck={handleDeleteTruck} />}
       </div>

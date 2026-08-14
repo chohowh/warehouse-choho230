@@ -60,3 +60,31 @@ create table if not exists wh_archive (
 alter table wh_archive enable row level security;
 drop policy if exists "allow all" on wh_archive;
 create policy "allow all" on wh_archive for all using (true) with check (true);
+
+-- ─── wh_basket_returns ─────────────────────────────────────
+-- log การคืนตะกร้า/ตะขอ หนึ่งแถวต่อการคืนหนึ่งครั้ง — สะสมตลอดไป
+-- ไม่ถูกล้างตอนกดปิดงาน (handleReset) ต่างจาก wh_queue/wh_trucks
+-- data = { plate, yellowBig, yellowSmall, gray, hooks, returnedAt }
+-- หน้า "ข้อมูลยอดตะกร้า/ตะขอ" เทียบยอดนี้กับยอดที่ออกไปสะสมทุกวัน (ทุก wh_archive.trucks
+-- รวมคิววันนี้ที่ยังไม่ปิดงาน) เพื่อคำนวณว่าแต่ละทะเบียนยังค้างคืนเท่าไร
+create table if not exists wh_basket_returns (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_basket_returns enable row level security;
+drop policy if exists "allow all" on wh_basket_returns;
+create policy "allow all" on wh_basket_returns for all using (true) with check (true);
+
+-- ─── wh_master_upload_log ──────────────────────────────────
+-- log ทุกครั้งที่มีการอัปโหลด/เปลี่ยนไฟล์ Master ลานโหลด หนึ่งแถวต่อครั้ง — สะสมตลอดไป
+-- data = { fileName, uploadedAt, matched, total }
+-- แสดงในหน้า "อัพโหลด Master" เป็นประวัติการอัพโหลด
+create table if not exists wh_master_upload_log (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_master_upload_log enable row level security;
+drop policy if exists "allow all" on wh_master_upload_log;
+create policy "allow all" on wh_master_upload_log for all using (true) with check (true);
