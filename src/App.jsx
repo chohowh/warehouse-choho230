@@ -3686,12 +3686,6 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <h2 style={{ fontWeight: 900, fontSize: 22, marginBottom: 16 }}>⚙️ Admin — แก้ไขข้อมูล</h2>
 
-      <SystemSettings />
-      <LaneAliasSettings />
-      <WaitingReasonSettings />
-      <BasketTypeSettings />
-      <DetailSourceSettings />
-
       {/* Truck selector */}
       <div style={card}>
         <label style={lbl}>เลือกทะเบียนรถ</label>
@@ -4205,7 +4199,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
 
       {(masterLane || []).length === 0 && (
         <div style={{ background: "#f9fafb", border: "1.5px dashed #d1d5db", borderRadius: 0, padding: 20, color: "#9ca3af", fontWeight: 600, fontSize: 14, textAlign: "center" }}>
-          🗂️ กรุณาอัปโหลดไฟล์ Master ลานโหลดก่อน (เมนู "อัพโหลด Master")
+          🗂️ กรุณาอัปโหลดไฟล์ Master ลานโหลดก่อน (เมนู "Master Setting")
         </div>
       )}
     </div>
@@ -4312,7 +4306,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 900 }}>🗂️ อัพโหลด Master</h2>
+      <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 900 }}>🗂️ Master Setting</h2>
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 20 }}>
       <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20, border: "2px solid #111", flex: 1, minWidth: 320 }}>
@@ -4404,6 +4398,14 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
           )
         }
       </div>
+      </div>
+
+      <div style={{ marginTop: 20, maxWidth: 640 }}>
+        <SystemSettings />
+        <LaneAliasSettings />
+        <WaitingReasonSettings />
+        <BasketTypeSettings />
+        <DetailSourceSettings />
       </div>
     </div>
   );
@@ -5269,7 +5271,7 @@ export default function App() {
     { id: "detail_loading", label: "อัพโหลด PO", icon: "clipboard" },
     { id: "download",       label: "จบการทำงาน",       icon: "invoice"   },
     { id: "admin",          label: "Admin",          icon: "plan"      },
-    { id: "master_upload", label: "อัพโหลด Master", icon: "clipboard" },
+    { id: "master_upload", label: "Master Setting", icon: "clipboard" },
     { id: "qr",             label: "QR Code",       icon: "scan"      },
   ];
 
