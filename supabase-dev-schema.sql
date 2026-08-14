@@ -88,3 +88,63 @@ create table if not exists wh_master_upload_log (
 alter table wh_master_upload_log enable row level security;
 drop policy if exists "allow all" on wh_master_upload_log;
 create policy "allow all" on wh_master_upload_log for all using (true) with check (true);
+
+-- ─── wh_settings ───────────────────────────────────────────
+-- ค่า config ที่เคย hardcode ไว้ในโค้ด (cutoff hour, threshold ต่างๆ) ดูรายละเอียด
+-- key ที่รองรับใน supabase-add-settings.sql / src/lib/settings.js
+create table if not exists wh_settings (
+  id    text primary key,
+  value jsonb
+);
+
+alter table wh_settings enable row level security;
+drop policy if exists "allow all" on wh_settings;
+create policy "allow all" on wh_settings for all using (true) with check (true);
+
+-- ─── wh_lane_aliases ───────────────────────────────────────
+-- ชื่อเรียกลานแบบอื่นๆ ที่พบในไฟล์ Master นอกเหนือจาก default ในโค้ด
+-- id = alias text, data = { laneKey }
+create table if not exists wh_lane_aliases (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_lane_aliases enable row level security;
+drop policy if exists "allow all" on wh_lane_aliases;
+create policy "allow all" on wh_lane_aliases for all using (true) with check (true);
+
+-- ─── wh_waiting_reasons ────────────────────────────────────
+-- รายการเหตุผล "รอสินค้าอะไร" (fallback เมื่อไฟล์ Master ไม่มีชื่อสินค้า match)
+-- data = { label, sortOrder }
+create table if not exists wh_waiting_reasons (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_waiting_reasons enable row level security;
+drop policy if exists "allow all" on wh_waiting_reasons;
+create policy "allow all" on wh_waiting_reasons for all using (true) with check (true);
+
+-- ─── wh_basket_types ───────────────────────────────────────
+-- ประเภทตะกร้า/ตะขอ เสริม/override 4 ตัว default ในโค้ด (yellowBig/yellowSmall/gray/hooks)
+-- id = key คงที่, data = { label, countsInTotal, sortOrder }
+create table if not exists wh_basket_types (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_basket_types enable row level security;
+drop policy if exists "allow all" on wh_basket_types;
+create policy "allow all" on wh_basket_types for all using (true) with check (true);
+
+-- ─── wh_detail_sources ─────────────────────────────────────
+-- ช่องทาง PO เสริม/override 3 ช่องทาง default ในโค้ด (wet_market/modern_trade/others)
+-- id = รหัสช่องทางคงที่, data = { label, emoji, color, bg, plateCol, productCodeCol, groupFlagCol, matchKeywords }
+create table if not exists wh_detail_sources (
+  id   text primary key,
+  data jsonb
+);
+
+alter table wh_detail_sources enable row level security;
+drop policy if exists "allow all" on wh_detail_sources;
+create policy "allow all" on wh_detail_sources for all using (true) with check (true);

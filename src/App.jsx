@@ -23,6 +23,13 @@ import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
 import { uploadToR2 } from "./lib/r2";
 import { sendTeamsNotification } from "./utils/teams";
+import { settings, saveSetting } from "./lib/settings";
+import {
+  laneAliases, saveLaneAlias, deleteLaneAlias,
+  waitingReasons as waitingReasonPresets, addWaitingReason, deleteWaitingReason,
+  basketTypes, saveBasketType, deleteBasketType,
+  detailSources, saveDetailSource, deleteDetailSource,
+} from "./lib/masterData";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FLOW:
@@ -56,13 +63,20 @@ const FLOW_STEPS = [
 ];
 
 const TODAY = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
-const SHORT_DATE = `${new Date().getDate()}/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+// รูปแบบ D/M/YYYY (ไม่ padStart) ให้ตรงกับที่ parseQueueDateToISO/toDateStr ฝั่งอ่านคาดหวัง
+// ก่อนหน้านี้เป็น const คำนวณครั้งเดียวตอนโหลดโมดูล ไม่มี cutoff เลย (ต่างจาก DATE_STR/
+// cycleDateStr) — เปลี่ยนเป็นฟังก์ชันที่ตัดรอบด้วย settings.workDayCutoffHour เดียวกัน
+const SHORT_DATE = () => {
+  const d = new Date();
+  if (d.getHours() < settings.workDayCutoffHour) d.setDate(d.getDate() - 1);
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+};
 const TIME_NOW = () => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 const getStep = (status) => STATUS_META[status]?.step ?? 0;
 
 const DATE_STR = () => {
   const d = new Date();
-  if (d.getHours() < 9) d.setDate(d.getDate() - 1);
+  if (d.getHours() < settings.workDayCutoffHour) d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const safePlate = p => String(p).replace(/[^a-zA-Z0-9]/g, "") || "unknown";
@@ -106,11 +120,7 @@ async function uploadPhotos(folder, plate, photos) {
   return urls;
 }
 
-// ─── GEOFENCE ────────────────────────────────────────────────────────────────
-const FACTORY_LAT = 14.7260;
-const FACTORY_LNG = 100.7950;
-const GEOFENCE_RADIUS_M = 2000; // meters (2 km)
-
+// ─── GEOFENCE (พิกัด/รัศมีอ่านจาก settings.geofence) ──────────────────────────
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = d => d * Math.PI / 180;
@@ -132,8 +142,8 @@ function useGeofence() {
     setState(s => ({ ...s, status: "loading" }));
     watchRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const d = haversineDistance(pos.coords.latitude, pos.coords.longitude, FACTORY_LAT, FACTORY_LNG);
-        setState({ status: d <= GEOFENCE_RADIUS_M ? "inside" : "outside", distance: Math.round(d), error: null });
+        const d = haversineDistance(pos.coords.latitude, pos.coords.longitude, settings.geofence.lat, settings.geofence.lng);
+        setState({ status: d <= settings.geofence.radiusM ? "inside" : "outside", distance: Math.round(d), error: null });
       },
       (err) => {
         const msgs = { 1: "กรุณาอนุญาตการเข้าถึงตำแหน่ง (Location)", 2: "ไม่สามารถหาตำแหน่งได้ กรุณาเปิด GPS", 3: "หมดเวลาหาตำแหน่ง กรุณาลองใหม่" };
@@ -505,13 +515,13 @@ const parseExitDatetime = (dateStr, timeStr) => {
     if (month > 12) { [day, month] = [month, day]; }
     if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
       const d = new Date(year, month - 1, day, h, min, 0, 0);
-      if (h * 60 + min <= 9 * 60) d.setDate(d.getDate() + 1);
+      if (h * 60 + min <= settings.workDayCutoffHour * 60) d.setDate(d.getDate() + 1);
       return d;
     }
   }
   // ไม่มี date → fallback วันนี้ + ปรับข้ามคืน
   const d = new Date(); d.setHours(h, min, 0, 0);
-  if (h * 60 + min <= 9 * 60) d.setDate(d.getDate() + 1);
+  if (h * 60 + min <= settings.workDayCutoffHour * 60) d.setDate(d.getDate() + 1);
   return d;
 };
 
@@ -676,7 +686,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
         ? <div style={{ padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", maxHeight: "calc(100vh - 130px)" }}>
             {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck, assignedLanes }) => {
               const rem = getRemMins({ date, exitTime });
-              const urgent = rem < 20 && truck?.status !== "invoiced";
+              const urgent = rem < settings.waitingUrgentMinutes && truck?.status !== "invoiced";
               const anyQC = LOADING_LANES.some(l => truck?.qcLanes?.[l.id]?.done);
               const mine = isMyPlate(plate);
               return (
@@ -745,7 +755,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
               <tbody>
                 {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck, assignedLanes }) => {
                   const rem = getRemMins({ date, exitTime });
-                  const urgent = rem < 20 && truck?.status !== "invoiced";
+                  const urgent = rem < settings.waitingUrgentMinutes && truck?.status !== "invoiced";
                   const mine = isMyPlate(plate);
                   return (
                     <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6", background: mine ? "#eff6ff" : undefined }}>
@@ -963,12 +973,12 @@ const toHHMM = (val) => {
   return String(val);
 };
 
-// ถ้า exitTime อยู่ในช่วง 00:00–09:00 → วันที่จริงคือ dateStr + 1 (กะข้ามคืน)
+// ถ้า exitTime อยู่ก่อนเวลาตัดรอบวันทำงาน (settings.workDayCutoffHour) → วันที่จริงคือ dateStr + 1 (กะข้ามคืน)
 const displayDate = (dateStr, exitTime) => {
   if (!dateStr || !exitTime) return dateStr || "";
   const [hStr, minStr] = exitTime.split(":");
   const h = parseInt(hStr, 10); const min = parseInt(minStr, 10);
-  if (isNaN(h) || isNaN(min) || h * 60 + min > 9 * 60) return dateStr;
+  if (isNaN(h) || isNaN(min) || h * 60 + min > settings.workDayCutoffHour * 60) return dateStr;
   const parts = dateStr.split("/");
   if (parts.length !== 3) return dateStr;
   let [d, m, y] = parts.map(Number);
@@ -1021,7 +1031,7 @@ const LGUpload = ({ queue, onSetQueue }) => {
     if (!manualData.plate) return;
     setQueueSaving(true);
     try {
-      await onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, date: manualData.date || SHORT_DATE, time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
+      await onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, date: manualData.date || SHORT_DATE(), time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
       setManualData({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
       setAddingManual(false);
     } catch (e) {
@@ -1772,11 +1782,11 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
   const thisLaneQCd = sel?.qcLanes?.[lane]?.done;
 
   const handlePhoto = e => {
-    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, settings.maxPhotoUploads); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setPhoto(prev => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
-        return [...p, ...newPhotos].slice(0, 15);
+        return [...p, ...newPhotos].slice(0, settings.maxPhotoUploads);
       });
     }).catch(err => alert(err.message));
   };
@@ -1891,11 +1901,11 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
   const thisLaneChecked = sel?.sampleLanes?.[lane]?.done;
 
   const handlePhoto = e => {
-    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, settings.maxPhotoUploads); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setPhoto(prev => {
         const p = Array.isArray(prev) ? prev : (prev ? [prev] : []);
-        return [...p, ...newPhotos].slice(0, 15);
+        return [...p, ...newPhotos].slice(0, settings.maxPhotoUploads);
       });
     }).catch(err => alert(err.message));
   };
@@ -1999,7 +2009,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
 // ── 5. LOADING YARD (per-lane gate) ───────────────────────────────────────────
 const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const [activeLane, setActiveLane] = useState(laneId ?? "lane_parts");
-  const emptyBaskets = () => ({ yellowBig: "", yellowSmall: "", gray: "", hooks: "", payer: "" });
+  const emptyBaskets = () => ({ ...Object.fromEntries(basketTypes.map(b => [b.key, ""])), payer: "" });
   const [forms, setForms] = useState({
     lane_parts: { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
     lane_head:  { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
@@ -2009,11 +2019,11 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const curLane = LOADING_LANES.find(l => l.id === activeLane);
   const form    = forms[activeLane];
   const setBasket = (key, val) => setF(activeLane, { baskets: { ...form.baskets, [key]: val } });
-  const basketTotal = ["yellowBig", "yellowSmall", "gray"].reduce((sum, k) => sum + (Number(form.baskets?.[k]) || 0), 0);
+  const basketTotal = basketTypes.filter(b => b.countsInTotal).reduce((sum, b) => sum + (Number(form.baskets?.[b.key]) || 0), 0);
   const [basketsOpen, setBasketsOpen] = useState(false);
   const [waitingModal, setWaitingModal] = useState(false);
   const [waitingReasons, setWaitingReasons] = useState([""]);
-  const MAX_WAITING_REASONS = 3;
+  const MAX_WAITING_REASONS = settings.maxWaitingReasons;
   const setReasonAt = (idx, val) => setWaitingReasons(rs => rs.map((r, i) => i === idx ? val : r));
   const addReasonField = () => setWaitingReasons(rs => rs.length >= MAX_WAITING_REASONS ? rs : [...rs, ""]);
   const removeReasonField = (idx) => setWaitingReasons(rs => rs.length <= 1 ? rs : rs.filter((_, i) => i !== idx));
@@ -2025,6 +2035,8 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
       if (m.laneKey === activeLane && m.productNameTha) names.add(m.productNameTha);
     }
     if (names.size) return [...names].sort((a, b) => a.localeCompare(b, "th"));
+    if (waitingReasonPresets.length) return waitingReasonPresets.map(r => r.label);
+    // default เดิมในโค้ด — ใช้ก่อนจะมีข้อมูลใน wh_waiting_reasons เลย
     return ["รอเบิกสินค้าจากคลัง", "รอแพ็ค/ชั่งน้ำหนักสินค้า", "รอสินค้าจากไลน์ผลิต", "รอรถขนย้ายภายใน"];
   })();
 
@@ -2039,12 +2051,12 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const sel = trucks.find(t => t.id === form.selId) || null;
 
   const handlePhoto = lId => e => {
-    const files = Array.from(e.target.files).slice(0, 15); if (!files.length) return;
+    const files = Array.from(e.target.files).slice(0, settings.maxPhotoUploads); if (!files.length) return;
     Promise.all(files.map(compressImage)).then(newPhotos => {
       setForms(prev => {
         const f = prev[lId];
         const curPhotos = Array.isArray(f.photo) ? f.photo : (f.photo ? [f.photo] : []);
-        return { ...prev, [lId]: { ...f, photo: [...curPhotos, ...newPhotos].slice(0, 15) } };
+        return { ...prev, [lId]: { ...f, photo: [...curPhotos, ...newPhotos].slice(0, settings.maxPhotoUploads) } };
       });
     }).catch(err => alert(err.message));
   };
@@ -2078,12 +2090,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
       const photos = Array.isArray(form.photo) ? form.photo : (form.photo ? [form.photo] : []);
       const photoUrls = await uploadPhotos(`loading/${activeLane}`, sel.plate, photos);
       const existing = sel.loadLanes?.[activeLane] || {};
-      const baskets = {
-        yellowBig:   Number(form.baskets?.yellowBig) || 0,
-        yellowSmall: Number(form.baskets?.yellowSmall) || 0,
-        gray:        Number(form.baskets?.gray) || 0,
-        hooks:       Number(form.baskets?.hooks) || 0,
-      };
+      const baskets = Object.fromEntries(basketTypes.map(b => [b.key, Number(form.baskets?.[b.key]) || 0]));
       const basketPayer = (form.baskets?.payer || "").trim();
       const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer } };
       await onUpdate(sel.id, { loadLanes });
@@ -2160,29 +2167,14 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
           </div>
           {basketsOpen && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (ใหญ่)</label>
-                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowBig ?? ""} onChange={e => setBasket("yellowBig", e.target.value)}
-                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เหลือง (เล็ก)</label>
-                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.yellowSmall ?? ""} onChange={e => setBasket("yellowSmall", e.target.value)}
-                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>เทา</label>
-                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.gray ?? ""} onChange={e => setBasket("gray", e.target.value)}
-                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>ตะขอแขวนซาก</label>
-                  <input type="number" min="0" inputMode="numeric" value={form.baskets?.hooks ?? ""} onChange={e => setBasket("hooks", e.target.value)}
-                    style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: 8 }}>
+                {basketTypes.map(b => (
+                  <div key={b.key}>
+                    <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{b.label}</label>
+                    <input type="number" min="0" inputMode="numeric" value={form.baskets?.[b.key] ?? ""} onChange={e => setBasket(b.key, e.target.value)}
+                      style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "8px 10px", fontSize: 14, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                  </div>
+                ))}
                 <div>
                   <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>รวมตะกร้า</label>
                   <div style={{ padding: "8px 10px", fontSize: 14, fontWeight: 700, color: curLane.color, background: "#fff", border: `1.5px solid ${curLane.border}`, boxSizing: "border-box" }}>{basketTotal}</div>
@@ -2265,15 +2257,15 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
 };
 
 // ── 6.5 LOADING LOG (chat-style feed of completed loads) ─────────────────────
-// the work-day rolls over at 10:00, not midnight — must stay in sync everywhere
-// a "which work-day does this belong to" decision is made (cycleDateStr,
-// handleReset's archive-date calc, and the two helpers below), otherwise a time
-// or date can get filed under the wrong work-day in one place but not another.
-const WORK_DAY_CUTOFF_HOUR = 10;
-
+// the work-day rolls over at settings.workDayCutoffHour, not midnight — must stay
+// in sync everywhere a "which work-day does this belong to" decision is made
+// (cycleDateStr, handleReset's archive-date calc, DATE_STR, SHORT_DATE,
+// parseExitDatetime, displayDate), otherwise a time/date can get filed under the
+// wrong work-day in one place but not another. All of those now read the same
+// settings.workDayCutoffHour value instead of each hardcoding their own hour.
 const cycleDateStr = () => {
   const d = new Date();
-  if (d.getHours() < WORK_DAY_CUTOFF_HOUR) d.setDate(d.getDate() - 1);
+  if (d.getHours() < settings.workDayCutoffHour) d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
@@ -2282,7 +2274,7 @@ const cycleDateStr = () => {
 // the previous work-day) — show that real date next to the time so it's not confusing.
 const formatLogTime = (doneAt, workDate) => {
   const hour = parseInt(doneAt.split(":")[0], 10);
-  if (hour >= WORK_DAY_CUTOFF_HOUR) return doneAt;
+  if (hour >= settings.workDayCutoffHour) return doneAt;
   const [y, m, d] = workDate.split("-").map(Number);
   const realDate = new Date(y, m - 1, d + 1);
   const dd = String(realDate.getDate()).padStart(2, "0");
@@ -2295,7 +2287,7 @@ const formatLogTime = (doneAt, workDate) => {
 // sort after evening times of the same work-day (e.g. 18:00 < 00:14 next day).
 const workTimeValue = (doneAt) => {
   const [h, m] = doneAt.split(":").map(Number);
-  return (h < WORK_DAY_CUTOFF_HOUR ? h + 24 : h) * 60 + m;
+  return (h < settings.workDayCutoffHour ? h + 24 : h) * 60 + m;
 };
 
 const buildLaneEvents = (list, sources) => {
@@ -2516,7 +2508,8 @@ const BasketSummary = ({ trucks }) => {
   const sourceTrucks = archiveTrucks ?? (date === today ? trucks : []);
 
   // ── การคืนตะกร้า (สะสมข้ามวัน ไม่ล้างตอนปิดงาน) ──
-  const emptyReturnForm = () => ({ plate: "", yellowBig: "", yellowSmall: "", gray: "", hooks: "" });
+  const zeroBaskets = () => Object.fromEntries(basketTypes.map(b => [b.key, 0]));
+  const emptyReturnForm = () => ({ plate: "", ...Object.fromEntries(basketTypes.map(b => [b.key, ""])) });
   const [allArchiveTrucks, setAllArchiveTrucks] = useState([]);
   const [returns, setReturns] = useState([]);
   const [returnForm, setReturnForm] = useState(emptyReturnForm());
@@ -2544,11 +2537,8 @@ const BasketSummary = ({ trucks }) => {
     for (const l of LOADING_LANES) {
       const ld = t.loadLanes?.[l.id];
       if (!ld?.baskets) continue;
-      const cur = issuedByPlate[key] || { plate: t.plate, yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
-      cur.yellowBig   += ld.baskets.yellowBig   || 0;
-      cur.yellowSmall += ld.baskets.yellowSmall || 0;
-      cur.gray        += ld.baskets.gray        || 0;
-      cur.hooks       += ld.baskets.hooks       || 0;
+      const cur = issuedByPlate[key] || { plate: t.plate, ...zeroBaskets() };
+      for (const b of basketTypes) cur[b.key] += ld.baskets[b.key] || 0;
       issuedByPlate[key] = cur;
     }
   }
@@ -2559,25 +2549,18 @@ const BasketSummary = ({ trucks }) => {
     if (!r?.plate) continue;
     const key = plateNum(r.plate);
     if (!key) continue;
-    const cur = returnedByPlate[key] || { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
-    cur.yellowBig   += r.yellowBig   || 0;
-    cur.yellowSmall += r.yellowSmall || 0;
-    cur.gray        += r.gray        || 0;
-    cur.hooks       += r.hooks       || 0;
+    const cur = returnedByPlate[key] || zeroBaskets();
+    for (const b of basketTypes) cur[b.key] += r[b.key] || 0;
     returnedByPlate[key] = cur;
   }
 
   const outstandingRows = Object.keys(issuedByPlate).map(key => {
     const issued = issuedByPlate[key];
     const plate = issued.plate;
-    const returned = returnedByPlate[key] || { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 };
-    const out = {
-      yellowBig:   issued.yellowBig   - returned.yellowBig,
-      yellowSmall: issued.yellowSmall - returned.yellowSmall,
-      gray:        issued.gray        - returned.gray,
-      hooks:       issued.hooks       - returned.hooks,
-    };
-    return { plate, out, total: out.yellowBig + out.yellowSmall + out.gray + out.hooks };
+    const returned = returnedByPlate[key] || zeroBaskets();
+    const out = Object.fromEntries(basketTypes.map(b => [b.key, issued[b.key] - returned[b.key]]));
+    const total = basketTypes.reduce((sum, b) => sum + out[b.key], 0);
+    return { plate, out, total };
   }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
 
   const outstandingGrandTotal = outstandingRows.reduce((sum, r) => sum + r.total, 0);
@@ -2585,13 +2568,8 @@ const BasketSummary = ({ trucks }) => {
   const submitReturn = async () => {
     const plate = returnForm.plate.trim();
     if (!plate) { alert("กรุณากรอกทะเบียนรถ"); return; }
-    const counts = {
-      yellowBig:   Number(returnForm.yellowBig)   || 0,
-      yellowSmall: Number(returnForm.yellowSmall) || 0,
-      gray:        Number(returnForm.gray)        || 0,
-      hooks:       Number(returnForm.hooks)       || 0,
-    };
-    if (!counts.yellowBig && !counts.yellowSmall && !counts.gray && !counts.hooks) {
+    const counts = Object.fromEntries(basketTypes.map(b => [b.key, Number(returnForm[b.key]) || 0]));
+    if (!Object.values(counts).some(v => v > 0)) {
       alert("กรุณากรอกจำนวนตะกร้า/ตะขอที่คืนอย่างน้อย 1 ช่อง");
       return;
     }
@@ -2615,17 +2593,14 @@ const BasketSummary = ({ trucks }) => {
 
   const totals = {};
   const payersByLane = {};
-  for (const l of LOADING_LANES) { totals[l.id] = { yellowBig: 0, yellowSmall: 0, gray: 0, hooks: 0 }; payersByLane[l.id] = new Set(); }
+  for (const l of LOADING_LANES) { totals[l.id] = zeroBaskets(); payersByLane[l.id] = new Set(); }
 
   const detailRows = [];
   for (const t of sourceTrucks) {
     for (const l of LOADING_LANES) {
       const ld = t.loadLanes?.[l.id];
       if (!ld?.baskets) continue;
-      totals[l.id].yellowBig   += ld.baskets.yellowBig || 0;
-      totals[l.id].yellowSmall += ld.baskets.yellowSmall || 0;
-      totals[l.id].gray        += ld.baskets.gray || 0;
-      totals[l.id].hooks       += ld.baskets.hooks || 0;
+      for (const b of basketTypes) totals[l.id][b.key] += ld.baskets[b.key] || 0;
       if (ld.basketPayer) payersByLane[l.id].add(ld.basketPayer);
       detailRows.push({ key: `${t.id}_${l.id}`, plate: t.plate, lane: l, baskets: ld.baskets, payer: ld.basketPayer, doneAt: ld.doneAt });
     }
@@ -2635,20 +2610,13 @@ const BasketSummary = ({ trucks }) => {
     ? detailRows.filter(r => r.plate?.toLowerCase().includes(plateFilter.trim().toLowerCase()))
     : detailRows;
 
-  const ROWS = [
-    { key: "yellowBig",   label: "เหลือง (ใหญ่)" },
-    { key: "yellowSmall", label: "เหลือง (เล็ก)" },
-    { key: "gray",        label: "เทา" },
-    { key: "hooks",       label: "ตะขอแขวนซาก" },
-  ];
-  const laneTotal = (l) => totals[l.id].yellowBig + totals[l.id].yellowSmall + totals[l.id].gray;
-
+  const laneTotal = (l) => basketTypes.filter(b => b.countsInTotal).reduce((sum, b) => sum + totals[l.id][b.key], 0);
 
   const exportExcel = () => {
     const summaryRows = [
-      ...ROWS.map(r => ({
-        "สีตะกร้า": r.label,
-        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, totals[l.id][r.key] || 0])),
+      ...basketTypes.map(b => ({
+        "สีตะกร้า": b.label,
+        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, totals[l.id][b.key] || 0])),
       })),
       {
         "สีตะกร้า": "รวมตะกร้า",
@@ -2662,19 +2630,13 @@ const BasketSummary = ({ trucks }) => {
     const detailRowsForExport = filteredDetailRows.map(r => ({
       "ทะเบียน": r.plate,
       "ลาน": r.lane.tinyLabel,
-      "เหลือง(ใหญ่)": r.baskets.yellowBig || 0,
-      "เหลือง(เล็ก)": r.baskets.yellowSmall || 0,
-      "เทา": r.baskets.gray || 0,
-      "ตะขอ": r.baskets.hooks || 0,
+      ...Object.fromEntries(basketTypes.map(b => [b.label, r.baskets[b.key] || 0])),
       "ผู้จ่าย": r.payer || "",
       "เวลา": r.doneAt || "",
     }));
     const outstandingForExport = outstandingRows.map(r => ({
       "ทะเบียน": r.plate,
-      "เหลือง(ใหญ่)": r.out.yellowBig,
-      "เหลือง(เล็ก)": r.out.yellowSmall,
-      "เทา": r.out.gray,
-      "ตะขอ": r.out.hooks,
+      ...Object.fromEntries(basketTypes.map(b => [b.label, r.out[b.key]])),
       "รวมค้างคืน": r.total,
     }));
     const wb = XLSX.utils.book_new();
@@ -2718,16 +2680,11 @@ const BasketSummary = ({ trucks }) => {
             {Object.values(issuedByPlate).map(v => <option key={v.plate} value={v.plate} />)}
           </datalist>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-            {[
-              { key: "yellowBig",   label: "เหลือง (ใหญ่)" },
-              { key: "yellowSmall", label: "เหลือง (เล็ก)" },
-              { key: "gray",        label: "เทา" },
-              { key: "hooks",       label: "ตะขอแขวนซาก" },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{f.label}</label>
-                <input type="number" min="0" inputMode="numeric" value={returnForm[f.key]}
-                  onChange={e => setReturnForm(fm => ({ ...fm, [f.key]: e.target.value }))}
+            {basketTypes.map(b => (
+              <div key={b.key}>
+                <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 4 }}>{b.label}</label>
+                <input type="number" min="0" inputMode="numeric" value={returnForm[b.key]}
+                  onChange={e => setReturnForm(fm => ({ ...fm, [b.key]: e.target.value }))}
                   style={{ ...inp, width: "100%" }} />
               </div>
             ))}
@@ -2749,10 +2706,10 @@ const BasketSummary = ({ trucks }) => {
               </tr>
             </thead>
             <tbody>
-              {ROWS.map(r => (
-                <tr key={r.key}>
-                  <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.label}</td>
-                  {LOADING_LANES.map(l => <td key={l.id} style={td}>{totals[l.id][r.key] || 0}</td>)}
+              {basketTypes.map(b => (
+                <tr key={b.key}>
+                  <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{b.label}</td>
+                  {LOADING_LANES.map(l => <td key={l.id} style={td}>{totals[l.id][b.key] || 0}</td>)}
                 </tr>
               ))}
               <tr>
@@ -2781,10 +2738,7 @@ const BasketSummary = ({ trucks }) => {
                   <tr>
                     <th style={th}>ทะเบียน</th>
                     <th style={th}>ลาน</th>
-                    <th style={th}>เหลือง(ใหญ่)</th>
-                    <th style={th}>เหลือง(เล็ก)</th>
-                    <th style={th}>เทา</th>
-                    <th style={th}>ตะขอ</th>
+                    {basketTypes.map(b => <th key={b.key} style={th}>{b.label}</th>)}
                     <th style={th}>ผู้จ่าย</th>
                     <th style={th}>เวลา</th>
                   </tr>
@@ -2794,10 +2748,7 @@ const BasketSummary = ({ trucks }) => {
                     <tr key={r.key}>
                       <td style={{ ...td, fontWeight: 700 }}>{r.plate}</td>
                       <td style={{ ...td, color: r.lane.color }}>{r.lane.tinyLabel}</td>
-                      <td style={td}>{r.baskets.yellowBig || 0}</td>
-                      <td style={td}>{r.baskets.yellowSmall || 0}</td>
-                      <td style={td}>{r.baskets.gray || 0}</td>
-                      <td style={td}>{r.baskets.hooks || 0}</td>
+                      {basketTypes.map(b => <td key={b.key} style={td}>{r.baskets[b.key] || 0}</td>)}
                       <td style={td}>{r.payer || "—"}</td>
                       <td style={td}>{r.doneAt || "—"}</td>
                     </tr>
@@ -2821,10 +2772,7 @@ const BasketSummary = ({ trucks }) => {
                 <thead>
                   <tr>
                     <th style={{ ...th, textAlign: "left" }}>ทะเบียน</th>
-                    <th style={th}>เหลือง(ใหญ่)</th>
-                    <th style={th}>เหลือง(เล็ก)</th>
-                    <th style={th}>เทา</th>
-                    <th style={th}>ตะขอ</th>
+                    {basketTypes.map(b => <th key={b.key} style={th}>{b.label}</th>)}
                     <th style={th}>รวมค้างคืน</th>
                   </tr>
                 </thead>
@@ -2832,16 +2780,13 @@ const BasketSummary = ({ trucks }) => {
                   {outstandingRows.map(r => (
                     <tr key={r.plate}>
                       <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.plate}</td>
-                      <td style={td}>{r.out.yellowBig}</td>
-                      <td style={td}>{r.out.yellowSmall}</td>
-                      <td style={td}>{r.out.gray}</td>
-                      <td style={td}>{r.out.hooks}</td>
+                      {basketTypes.map(b => <td key={b.key} style={td}>{r.out[b.key]}</td>)}
                       <td style={{ ...td, fontWeight: 800, color: "#dc2626" }}>{r.total}</td>
                     </tr>
                   ))}
                   <tr>
                     <td style={{ ...td, textAlign: "left", fontWeight: 800, background: "#f9fafb" }}>รวมทั้งหมด</td>
-                    <td style={{ ...td, fontWeight: 800, background: "#f9fafb" }} colSpan={4}></td>
+                    <td style={{ ...td, fontWeight: 800, background: "#f9fafb" }} colSpan={basketTypes.length}></td>
                     <td style={{ ...td, fontWeight: 800, background: "#f9fafb", color: "#dc2626" }}>{outstandingGrandTotal}</td>
                   </tr>
                 </tbody>
@@ -2968,7 +2913,7 @@ const WaitingSummary = ({ trucks }) => {
                 </thead>
                 <tbody>
                   {filtered.map(r => {
-                    const urgent = r.ongoing && (r.durationMin ?? 0) >= 20;
+                    const urgent = r.ongoing && (r.durationMin ?? 0) >= settings.waitingUrgentMinutes;
                     return (
                       <tr key={r.key} style={{ background: urgent ? "#fff5f5" : undefined }}>
                         <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{r.plate}</td>
@@ -3235,6 +3180,421 @@ const Download = ({ onReset }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM SETTINGS (wh_settings) — ค่าที่เคย hardcode ในโค้ด แก้ตรงนี้แทน
+// ─────────────────────────────────────────────────────────────────────────────
+const SystemSettings = () => {
+  const [form, setForm] = useState({
+    workDayCutoffHour:    settings.workDayCutoffHour,
+    waitingUrgentMinutes: settings.waitingUrgentMinutes,
+    maxPhotoUploads:      settings.maxPhotoUploads,
+    maxWaitingReasons:    settings.maxWaitingReasons,
+    geofenceLat:          settings.geofence.lat,
+    geofenceLng:          settings.geofence.lng,
+    geofenceRadiusM:      settings.geofence.radiusM,
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg,    setMsg]    = useState("");
+
+  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    setMsg("");
+    try {
+      await Promise.all([
+        saveSetting("work_day_cutoff_hour",   Number(form.workDayCutoffHour)),
+        saveSetting("waiting_urgent_minutes", Number(form.waitingUrgentMinutes)),
+        saveSetting("max_photo_uploads",      Number(form.maxPhotoUploads)),
+        saveSetting("max_waiting_reasons",    Number(form.maxWaitingReasons)),
+        saveSetting("geofence", { lat: Number(form.geofenceLat), lng: Number(form.geofenceLng), radiusM: Number(form.geofenceRadiusM) }),
+      ]);
+      setMsg("✅ บันทึกการตั้งค่าสำเร็จ — มีผลทันทีในเซสชันนี้ เครื่องอื่นต้องรีเฟรชหน้าถึงจะเห็นค่าใหม่");
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={card}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>⚙️ ตั้งค่าระบบ</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>เวลาตัดรอบวันทำงาน (0-23)</label>
+          <input type="number" min="0" max="23" value={form.workDayCutoffHour} onChange={set("workDayCutoffHour")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>รอเกินกี่นาทีถึงขึ้น "urgent"</label>
+          <input type="number" min="1" value={form.waitingUrgentMinutes} onChange={set("waitingUrgentMinutes")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>จำนวนรูปสูงสุดต่อครั้ง</label>
+          <input type="number" min="1" value={form.maxPhotoUploads} onChange={set("maxPhotoUploads")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>จำนวนเหตุผลรอสินค้าสูงสุด</label>
+          <input type="number" min="1" value={form.maxWaitingReasons} onChange={set("maxWaitingReasons")} style={inp} />
+        </div>
+      </div>
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#6b7280", margin: "10px 0 6px" }}>📍 Geofence เช็คอินคนขับ</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div>
+          <label style={lbl}>Latitude</label>
+          <input type="number" step="any" value={form.geofenceLat} onChange={set("geofenceLat")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>Longitude</label>
+          <input type="number" step="any" value={form.geofenceLng} onChange={set("geofenceLng")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>รัศมี (เมตร)</label>
+          <input type="number" min="1" value={form.geofenceRadiusM} onChange={set("geofenceRadiusM")} style={inp} />
+        </div>
+      </div>
+      {msg && <div style={{ padding: "8px 10px", background: "#d1fae5", color: "#065f46", fontSize: 12, fontWeight: 700, marginBottom: 10 }}>{msg}</div>}
+      <button onClick={save} disabled={saving}
+        style={{ width: "100%", background: saving ? "#e5e7eb" : "#111", color: saving ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontWeight: 700, fontSize: 14, cursor: saving ? "default" : "pointer" }}>
+        {saving ? "⏳ กำลังบันทึก..." : "💾 บันทึกการตั้งค่า"}
+      </button>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANE ALIASES (wh_lane_aliases) — เพิ่มชื่อเรียกลานแบบอื่นๆ ที่ Master ใช้
+// ─────────────────────────────────────────────────────────────────────────────
+const LaneAliasSettings = () => {
+  const [rows, setRows] = useState(() => Object.entries(laneAliases).map(([alias, laneKey]) => ({ alias, laneKey })));
+  const [newAlias, setNewAlias] = useState("");
+  const [newLane, setNewLane] = useState(LOADING_LANES[0].id);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => setRows(Object.entries(laneAliases).map(([alias, laneKey]) => ({ alias, laneKey })));
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await saveLaneAlias(newAlias, newLane);
+      setNewAlias("");
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (alias) => {
+    if (!window.confirm(`ลบชื่อเรียกลาน "${alias}"?`)) return;
+    try {
+      await deleteLaneAlias(alias);
+      refresh();
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    }
+  };
+
+  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={card}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>🏷️ ชื่อเรียกลานอื่นๆ (Lane Aliases)</div>
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>ใช้ตอนอัปโหลด Master แล้วคอลัมน์ "ลานโหลด" สะกดไม่ตรงกับที่ระบบรู้จัก — ไม่ต้องแก้โค้ด เพิ่มที่นี่ได้เลย</div>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {rows.map(r => (
+            <div key={r.alias} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+              <span>"{r.alias}" → {LOADING_LANES.find(l => l.id === r.laneKey)?.tinyLabel || r.laneKey}</span>
+              <button onClick={() => remove(r.alias)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13 }}>🗑️ ลบ</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 8, alignItems: "end" }}>
+        <div>
+          <label style={lbl}>ชื่อเรียกลาน (ตามที่เจอในไฟล์)</label>
+          <input value={newAlias} onChange={e => setNewAlias(e.target.value)} style={inp} placeholder="เช่น หัวเครื่องในหมู" />
+        </div>
+        <div>
+          <label style={lbl}>คือลาน</label>
+          <select value={newLane} onChange={e => setNewLane(e.target.value)} style={inp}>
+            {LOADING_LANES.map(l => <option key={l.id} value={l.id}>{l.tinyLabel}</option>)}
+          </select>
+        </div>
+        <button onClick={add} disabled={busy}
+          style={{ background: busy ? "#e5e7eb" : "#111", color: busy ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>
+          + เพิ่ม
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WAITING REASONS (wh_waiting_reasons) — รายการเหตุผลรอสินค้า (fallback)
+// ─────────────────────────────────────────────────────────────────────────────
+const WaitingReasonSettings = () => {
+  const [rows, setRows] = useState(() => [...waitingReasonPresets]);
+  const [newLabel, setNewLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => setRows([...waitingReasonPresets]);
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await addWaitingReason(newLabel);
+      setNewLabel("");
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm(`ลบเหตุผล "${row.label}"?`)) return;
+    try {
+      await deleteWaitingReason(row.id);
+      refresh();
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    }
+  };
+
+  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={card}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>💬 รายการเหตุผลรอสินค้า (fallback)</div>
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>ใช้เฉพาะตอนไฟล์ Master ไม่มีชื่อสินค้า match กับลานนั้นเลย — ปกติ dropdown จะดึงชื่อสินค้าจาก Master ก่อนเสมอ</div>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {rows.map(r => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+              <span>{r.label}</span>
+              <button onClick={() => remove(r)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13 }}>🗑️ ลบ</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "end" }}>
+        <div>
+          <label style={lbl}>เหตุผลใหม่</label>
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} style={inp} placeholder="เช่น รอเบิกสินค้าจากคลัง" />
+        </div>
+        <button onClick={add} disabled={busy}
+          style={{ background: busy ? "#e5e7eb" : "#111", color: busy ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>
+          + เพิ่ม
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BASKET TYPES (wh_basket_types) — ประเภทตะกร้า/ตะขอ
+// ─────────────────────────────────────────────────────────────────────────────
+const BasketTypeSettings = () => {
+  const [rows, setRows] = useState(() => [...basketTypes]);
+  const [newKey, setNewKey] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [newCounts, setNewCounts] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => setRows([...basketTypes]);
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await saveBasketType(newKey, newLabel, newCounts);
+      setNewKey("");
+      setNewLabel("");
+      setNewCounts(true);
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (b) => {
+    if (!window.confirm(`ลบประเภท "${b.label}"? ถ้าเคยมีรถบันทึกข้อมูลด้วยประเภทนี้ไว้ ข้อมูลจะยังอยู่ในฐานข้อมูลแต่จะไม่แสดงในหน้าเว็บอีก`)) return;
+    try {
+      await deleteBasketType(b.key);
+      refresh();
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    }
+  };
+
+  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={card}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>🧺 ประเภทตะกร้า/ตะขอ</div>
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>4 ตัวแรก (เหลืองใหญ่/เล็ก, เทา, ตะขอ) เป็น default ในระบบ ลบไม่ได้ — เพิ่มประเภทใหม่ได้ที่นี่ แต่ห้ามเปลี่ยน/ลบ "รหัส (key)" ที่มีข้อมูลบันทึกไว้แล้ว</div>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {rows.map(b => (
+            <div key={b.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+              <span>{b.label} <span style={{ color: "#9ca3af", fontSize: 11 }}>({b.key}{b.countsInTotal ? ", นับรวมในรวมตะกร้า" : ""})</span></span>
+              {!["yellowBig", "yellowSmall", "gray", "hooks"].includes(b.key) && (
+                <button onClick={() => remove(b)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13 }}>🗑️ ลบ</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr auto auto", gap: 8, alignItems: "end" }}>
+        <div>
+          <label style={lbl}>รหัส (key, ภาษาอังกฤษ ไม่มีเว้นวรรค)</label>
+          <input value={newKey} onChange={e => setNewKey(e.target.value)} style={inp} placeholder="เช่น blueBig" />
+        </div>
+        <div>
+          <label style={lbl}>ชื่อที่แสดง</label>
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} style={inp} placeholder="เช่น น้ำเงิน (ใหญ่)" />
+        </div>
+        <div>
+          <label style={lbl}>นับรวม?</label>
+          <select value={newCounts ? "1" : "0"} onChange={e => setNewCounts(e.target.value === "1")} style={inp}>
+            <option value="1">นับรวม</option>
+            <option value="0">ไม่นับรวม</option>
+          </select>
+        </div>
+        <button onClick={add} disabled={busy}
+          style={{ background: busy ? "#e5e7eb" : "#111", color: busy ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>
+          + เพิ่ม
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DETAIL SOURCES (wh_detail_sources) — ช่องทาง PO + คอลัมน์ Excel ต่อช่องทาง
+// ─────────────────────────────────────────────────────────────────────────────
+const DetailSourceSettings = () => {
+  const [rows, setRows] = useState(() => [...detailSources]);
+  const emptyForm = { id: "", label: "", emoji: "📦", plateCol: "65", productCodeCol: "20", groupFlagCol: "11", matchKeywords: "" };
+  const [form, setForm] = useState(emptyForm);
+  const [busy, setBusy] = useState(false);
+  const DEFAULT_IDS = ["wet_market", "modern_trade", "others"];
+
+  const refresh = () => setRows([...detailSources]);
+  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      await saveDetailSource(form.id, {
+        label: form.label,
+        emoji: form.emoji,
+        color: "#6b7280",
+        bg: "#f3f4f6",
+        plateCol: Number(form.plateCol),
+        productCodeCol: Number(form.productCodeCol),
+        groupFlagCol: Number(form.groupFlagCol),
+        matchKeywords: form.matchKeywords.split(",").map(k => k.trim()).filter(Boolean),
+      });
+      setForm(emptyForm);
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (s) => {
+    if (!window.confirm(`ลบช่องทาง "${s.label}"? ไฟล์ที่เคยอัปโหลดไว้จะยังอยู่ในฐานข้อมูลแต่จะไม่แสดงในหน้าเว็บอีก`)) return;
+    try {
+      await deleteDetailSource(s.id);
+      refresh();
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    }
+  };
+
+  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <div style={card}>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>📦 ช่องทาง PO (Detail Sources)</div>
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
+        3 ช่องทางแรก (ตลาดสด/Makro/LOTUS) เป็น default ในระบบ ลบไม่ได้ — เพิ่มช่องทางใหม่ได้ที่นี่ ถ้า retailer วางคอลัมน์ plate/รหัสสินค้า/กลุ่มลูกค้าในตำแหน่งไม่ตรงกับ default (65/20/11) ตั้งเลขคอลัมน์ (นับจาก 0) ให้ตรงได้เลย
+      </div>
+      {rows.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {rows.map(s => (
+            <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>{s.emoji} {s.label} <span style={{ color: "#9ca3af", fontSize: 11 }}>({s.id})</span></span>
+                {!DEFAULT_IDS.includes(s.id) && (
+                  <button onClick={() => remove(s)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13 }}>🗑️ ลบ</button>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                คอลัมน์: plate={s.plateCol}, รหัสสินค้า={s.productCodeCol}, กลุ่มลูกค้า={s.groupFlagCol} · คำจับคู่: {(s.matchKeywords || []).join(", ") || "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <div>
+          <label style={lbl}>รหัสช่องทาง (id, ภาษาอังกฤษ)</label>
+          <input value={form.id} onChange={set("id")} style={inp} placeholder="เช่น big_c" />
+        </div>
+        <div>
+          <label style={lbl}>ชื่อที่แสดง</label>
+          <input value={form.label} onChange={set("label")} style={inp} placeholder="เช่น Big C" />
+        </div>
+        <div>
+          <label style={lbl}>Emoji</label>
+          <input value={form.emoji} onChange={set("emoji")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>คำจับคู่กลุ่มลูกค้า (คั่นด้วย ,)</label>
+          <input value={form.matchKeywords} onChange={set("matchKeywords")} style={inp} placeholder="เช่น bigc, big c" />
+        </div>
+        <div>
+          <label style={lbl}>คอลัมน์ทะเบียนรถ (0-based)</label>
+          <input type="number" value={form.plateCol} onChange={set("plateCol")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>คอลัมน์รหัสสินค้า (0-based)</label>
+          <input type="number" value={form.productCodeCol} onChange={set("productCodeCol")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>คอลัมน์กลุ่มลูกค้า (0-based)</label>
+          <input type="number" value={form.groupFlagCol} onChange={set("groupFlagCol")} style={inp} />
+        </div>
+      </div>
+      <button onClick={add} disabled={busy}
+        style={{ width: "100%", background: busy ? "#e5e7eb" : "#111", color: busy ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 0", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer" }}>
+        + เพิ่มช่องทาง
+      </button>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────────────────────────────────────────
 const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
@@ -3325,6 +3685,12 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <h2 style={{ fontWeight: 900, fontSize: 22, marginBottom: 16 }}>⚙️ Admin — แก้ไขข้อมูล</h2>
+
+      <SystemSettings />
+      <LaneAliasSettings />
+      <WaitingReasonSettings />
+      <BasketTypeSettings />
+      <DetailSourceSettings />
 
       {/* Truck selector */}
       <div style={card}>
@@ -3492,20 +3858,16 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DETAIL LOADING
+// DETAIL LOADING (channels/columns มาจาก wh_detail_sources — ดู src/lib/masterData.js)
 // ─────────────────────────────────────────────────────────────────────────────
-const DETAIL_SOURCES = [
-  { id: "wet_market",    label: "ตลาดสด",       emoji: "🛒", color: "#10b981", bg: "#d1fae5" },
-  { id: "modern_trade", label: "Makro",  emoji: "🏪", color: "#3b82f6", bg: "#dbeafe" },
-  { id: "others",       label: "LOTUS",          emoji: "📦", color: "#f97316", bg: "#fff7ed" },
-];
 
-// Map Thai lane names from Master file → lane IDs used in system
+// Map Thai lane names from Master file → lane IDs used in system — default/fallback
+// ที่ยังใช้งานได้แม้ยังไม่มีข้อมูลใน wh_lane_aliases เลย ส่วน alias ใหม่ๆ ที่เจอทีหลัง
+// (สะกดต่างออกไป) ให้เพิ่มผ่านหน้า Admin แทน ไม่ต้องแก้โค้ดนี้
 const LANE_NAME_MAP = {
-  "ชิ้นส่วน":         "lane_parts",
+  "ชิ้นส่วน":        "lane_parts",
   "หัว/เครื่องใน":   "lane_head",
-  "หัวเครื่องใน":   "lane_head",
-  "หัว/เครื่องใน":  "lane_head",
+  "หัวเครื่องใน":    "lane_head",
   "หมูซีก":          "lane_pork",
   // fallback: if value already is a lane ID, pass through
   "lane_parts":       "lane_parts",
@@ -3515,6 +3877,7 @@ const LANE_NAME_MAP = {
 const normalizeLaneKey = (raw) => {
   const t = String(raw || "").trim();
   if (!t) return null;
+  if (laneAliases[t]) return laneAliases[t];
   if (LANE_NAME_MAP[t]) return LANE_NAME_MAP[t];
   // partial match fallback
   if (t.includes("ชิ้นส่วน")) return "lane_parts";
@@ -3541,21 +3904,22 @@ const buildDetailMap = (masterLane, allDetailRows) => {
 // one detailMap per PO channel, so a plate's lanes never leak across channels
 const buildDetailMapByChannel = (masterLane, rowsByChannel) => {
   const result = {};
-  for (const src of DETAIL_SOURCES) result[src.id] = buildDetailMap(masterLane, rowsByChannel[src.id] || []);
+  for (const src of detailSources) result[src.id] = buildDetailMap(masterLane, rowsByChannel[src.id] || []);
   return result;
 };
 
 // LG's "กลุ่มลูกค้า" is a comma-separated list of sub-brand tags, e.g.
 // "MT-Lotus-CPFM,MT-LotusB2C,Wetmarket" — split & classify each token to a PO channel.
-// Unrecognized tags (CPFTH, FARM, ...) are simply ignored, not one of the 3 channels.
+// Unrecognized tags (CPFTH, FARM, ...) are simply ignored, not one of the known channels.
+// matchKeywords ต่อช่องทางมาจาก wh_detail_sources (ดู src/lib/masterData.js) — เพิ่ม
+// retailer ใหม่หรือคำที่ใช้จับคู่เพิ่มได้ผ่านหน้า Admin ไม่ต้องแก้โค้ดนี้
 const normalizeChannels = (customerGroup) => {
   const channels = new Set();
   for (const raw of String(customerGroup || "").split(",")) {
     const t = raw.trim().toLowerCase();
     if (!t) continue;
-    if (t.includes("makro")) channels.add("modern_trade");
-    else if (t.includes("lotus")) channels.add("others");
-    else if (t.includes("wetmarket") || t.includes("wet market")) channels.add("wet_market");
+    const src = detailSources.find(s => (s.matchKeywords || []).some(kw => t.includes(kw.toLowerCase())));
+    if (src) channels.add(src.id);
   }
   return channels;
 };
@@ -3596,7 +3960,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
     try { return JSON.parse(localStorage.getItem("wh_detail_names") || "{}"); } catch { return {}; }
   };
 
-  const [srcData,     setSrcData]     = useState(() => ({ wet_market: [], modern_trade: [], others: [], ...initSrc() }));
+  const [srcData,     setSrcData]     = useState(() => ({ ...Object.fromEntries(detailSources.map(s => [s.id, []])), ...initSrc() }));
   const [fileNames,   setFileNames]   = useState(initNames);
   const [showDebug,   setShowDebug]   = useState(false);
 
@@ -3636,7 +4000,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
         const row = payload.new;
         if (!row?.id) return;
         const today = cycleDateStr();
-        const src = DETAIL_SOURCES.find(s => `detail_${s.id}_${today}` === row.id);
+        const src = detailSources.find(s => `detail_${s.id}_${today}` === row.id);
         if (!src) return;
         const srcId = src.id;
         // Re-fetch แทนการอ่านจาก payload เพราะ JSONB ขนาดใหญ่อาจถูกตัดใน realtime
@@ -3663,8 +4027,11 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
     return () => supabase.removeChannel(channel);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Parse source file (col U=index20=productCode, col BN=index65=plate)
+  // Parse source file — ตำแหน่งคอลัมน์ (plateCol/productCodeCol/groupFlagCol) มาจาก
+  // wh_detail_sources ต่อช่องทาง (แต่ละ retailer วางคอลัมน์ไม่ตรงกันได้ ปรับได้ที่ Admin)
   const parseSourceFile = (file, srcId) => {
+    const src = detailSources.find(s => s.id === srcId) || {};
+    const plateCol = src.plateCol ?? 65, productCodeCol = src.productCodeCol ?? 20, groupFlagCol = src.groupFlagCol ?? 11;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       let parsed;
@@ -3679,11 +4046,11 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
         }
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-        const dataRows = rows.slice(1).filter(r => r[65] && String(r[65]).trim() !== "");
+        const dataRows = rows.slice(1).filter(r => r[plateCol] && String(r[plateCol]).trim() !== "");
         parsed = dataRows.map(r => ({
-          plate:        String(r[65] || "").trim(),
-          productCode:  normalizeProductCode(r[20]),
-          groupFlag:    String(r[11] || "").trim(),
+          plate:        String(r[plateCol] || "").trim(),
+          productCode:  normalizeProductCode(r[productCodeCol]),
+          groupFlag:    String(r[groupFlagCol] || "").trim(),
         })).filter(r => r.plate && r.productCode);
 
         setSrcData(prev => {
@@ -3718,7 +4085,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
   // tick re-rendering whichever tab is active — which is what made this page feel
   // stuck compared to others
   const allDetail = useMemo(
-    () => [...(srcData.wet_market || []), ...(srcData.modern_trade || []), ...(srcData.others || [])],
+    () => Object.values(srcData).flat(),
     [srcData]
   );
   const plateLaneMap = useMemo(() => {
@@ -3740,7 +4107,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
 
       {/* Source upload buttons (1-3) */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}>
-        {DETAIL_SOURCES.map(src => (
+        {detailSources.map(src => (
           <div key={src.id} style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <span style={{ fontSize: 28 }}>{src.emoji}</span>
@@ -4223,7 +4590,7 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
     fetchDetailSrc(date).then(remote => {
       if (cancelled) return;
       const rowsByChannel = {};
-      for (const src of DETAIL_SOURCES) rowsByChannel[src.id] = remote?.[src.id]?.rows || [];
+      for (const src of detailSources) rowsByChannel[src.id] = remote?.[src.id]?.rows || [];
       setHistDetailMapByChannel(buildDetailMapByChannel(masterLane, rowsByChannel));
     });
     return () => { cancelled = true; };
@@ -4361,7 +4728,7 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
 
   // แบ่งวันทำงาน (24 ชม. นับจากเวลาตัดรอบ) เป็น 8 ช่วง ๆ ละ 3 ชม. สำหรับ mini bar chart
   const bucketize = (items, timeFn, valueFn = null, buckets = 8) => {
-    const startMin = WORK_DAY_CUTOFF_HOUR * 60;
+    const startMin = settings.workDayCutoffHour * 60;
     const bucketMin = (24 * 60) / buckets;
     const sums = Array(buckets).fill(0);
     const counts = Array(buckets).fill(0);
@@ -4667,12 +5034,12 @@ const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue
 const fetchTrucks = async () => { const { data, error } = await supabase.from("wh_trucks").select("*"); if (error) throw error; return (data || []).map(r => r.data); };
 const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "master"); return data && data[0] ? (data[0].data || []) : []; };
 const fetchDetailSrc = async (date = cycleDateStr()) => {
-  const ids = DETAIL_SOURCES.map(s => `detail_${s.id}_${date}`);
+  const ids = detailSources.map(s => `detail_${s.id}_${date}`);
   const { data } = await supabase.from("wh_master").select("*").in("id", ids);
   if (!data || data.length === 0) return null;
   const result = {};
   for (const row of data) {
-    const src = DETAIL_SOURCES.find(s => `detail_${s.id}_${date}` === row.id);
+    const src = detailSources.find(s => `detail_${s.id}_${date}` === row.id);
     if (!src) continue;
     const payload = row.data || {};
     result[src.id] = {
@@ -4786,7 +5153,7 @@ export default function App() {
       const qData = {
         id: t.id,
         seq: queue.length + 1,
-        date: SHORT_DATE,
+        date: SHORT_DATE(),
         plate: t.plate,
         customerGroup: t.customerGroup || "",
         zone: t.zone || "",
