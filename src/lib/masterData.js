@@ -181,3 +181,128 @@ export async function deleteDetailSource(id) {
   const idx = detailSources.findIndex(s => s.id === id)
   if (idx >= 0 && !DEFAULT_DETAIL_SOURCES.some(s => s.id === id)) detailSources.splice(idx, 1)
 }
+
+// ตัวเลขคอลัมน์เริ่มต้นสำหรับฟอร์ม "เพิ่มช่องทาง PO ใหม่" — อ้างอิงจากช่องทาง default
+// ตัวแรก (wet_market) แทนที่จะพิมพ์ 65/20/11 ซ้ำอีกที่ (เดิมมี 2 จุดที่ hardcode ตัวเลข
+// เดียวกันนี้ซ้ำ ทั้งที่ค่าจริงมาจาก DEFAULT_DETAIL_SOURCES อยู่แล้ว)
+export function defaultDetailCols() {
+  const d = detailSources.find(s => s.id === "wet_market") || detailSources[0] || {}
+  return { plateCol: d.plateCol ?? 65, productCodeCol: d.productCodeCol ?? 20, groupFlagCol: d.groupFlagCol ?? 11 }
+}
+
+// ── Lanes (wh_lanes) ─────────────────────────────────────────────────────────
+// ป้ายชื่อ/สี/emoji ของลานโหลด — id (lane_parts/lane_head/lane_pork) ต้องคงที่ตลอด
+// อายุระบบ เพราะผูกกับ qcLanes/loadLanes/sampleLanes ที่บันทึกไว้แล้ว รวมถึง URL kiosk
+// mode (qc_parts, loading_parts, ...) ที่มี QR code พิมพ์ใช้งานจริงอยู่แล้ว ดังนั้นตาราง
+// นี้ "เพิ่ม" ลานใหม่ได้ (จะไปโผล่ในตารางที่ generic เช่น Dashboard/ใบสรุป/Basket Summary)
+// แต่การเพิ่มลานใหม่ให้มี kiosk URL/เมนูของตัวเองยังต้องแก้โค้ดส่วน routing อยู่ดี
+//
+// 3 ตัวนี้เป็น default ในโค้ด เสมอ — ข้อมูลจาก wh_lanes เป็นส่วนเสริม/override เท่านั้น
+const DEFAULT_LANES = [
+  { id: "lane_parts", label: "ลานโหลดชิ้นส่วน",       shortLabel: "ลานโหลดชิ้นส่วน", tinyLabel: "ชิ้นส่วน",     emoji: "🥩", color: "#f97316", bg: "#fff7ed", border: "#fed7aa", sortOrder: 1 },
+  { id: "lane_head",  label: "ลานโหลดหัว/เครื่องใน",  shortLabel: "ลานโหลดหัว/เครื่องใน", tinyLabel: "หัว/เครื่องใน", emoji: "🐷", color: "#8b5cf6", bg: "#faf5ff", border: "#ddd6fe", sortOrder: 2 },
+  { id: "lane_pork",  label: "ลานโหลดหมูซีก",          shortLabel: "ลานโหลดหมูซีก",        tinyLabel: "หมูซีก",        emoji: "🐖", color: "#e11d48", bg: "#fff1f2", border: "#fecdd3", sortOrder: 3 },
+]
+export const lanes = [...DEFAULT_LANES]
+
+export async function loadLanes() {
+  try {
+    const { data, error } = await supabase.from("wh_lanes").select("id, data")
+    if (error) throw error
+    const merged = [...DEFAULT_LANES]
+    for (const row of data || []) {
+      const d = row.data || {}
+      const base = merged.find(l => l.id === row.id) || {}
+      const entry = {
+        id: row.id,
+        label:      d.label      || base.label      || row.id,
+        shortLabel: d.shortLabel || base.shortLabel  || d.label || row.id,
+        tinyLabel:  d.tinyLabel  || base.tinyLabel   || d.label || row.id,
+        emoji:      d.emoji      || base.emoji       || "📦",
+        color:      d.color      || base.color       || "#6b7280",
+        bg:         d.bg         || base.bg          || "#f3f4f6",
+        border:     d.border     || base.border      || "#e5e7eb",
+        sortOrder:  Number.isFinite(d.sortOrder) ? d.sortOrder : (base.sortOrder ?? 0),
+      }
+      const idx = merged.findIndex(l => l.id === entry.id)
+      if (idx >= 0) merged[idx] = entry; else merged.push(entry)
+    }
+    merged.sort((a, b) => a.sortOrder - b.sortOrder)
+    lanes.length = 0
+    lanes.push(...merged)
+  } catch (e) {
+    console.error("โหลด wh_lanes ไม่สำเร็จ ใช้ default ในโค้ดไปก่อน:", e)
+  }
+}
+
+export async function saveLane(id, fields) {
+  const trimmedId = id.trim()
+  if (!trimmedId) throw new Error("กรุณาระบุรหัสลาน (id)")
+  const { error } = await supabase.from("wh_lanes").upsert({ id: trimmedId, data: fields })
+  if (error) throw error
+  const idx = lanes.findIndex(l => l.id === trimmedId)
+  const entry = { id: trimmedId, ...(idx >= 0 ? lanes[idx] : {}), ...fields }
+  if (idx >= 0) lanes[idx] = entry; else lanes.push(entry)
+}
+
+// ลบได้เฉพาะลานที่เพิ่มเองใหม่ (ไม่ใช่ 3 ลาน default ในโค้ด) — 3 ลาน default ผูกกับ
+// kiosk routing โดยตรง ลบไม่ได้
+export async function deleteLane(id) {
+  if (DEFAULT_LANES.some(l => l.id === id)) throw new Error("ลบลาน default ของระบบไม่ได้")
+  const { error } = await supabase.from("wh_lanes").delete().eq("id", id)
+  if (error) throw error
+  const idx = lanes.findIndex(l => l.id === id)
+  if (idx >= 0) lanes.splice(idx, 1)
+}
+
+// ── Roles (wh_roles) ─────────────────────────────────────────────────────────
+// ป้ายชื่อ/emoji/รูปของตำแหน่งงานในหน้าเลือกตำแหน่งงาน — id ต้องคงที่เสมอเพราะ
+// ROLE_TABS/LANE_SELECT_ROLES ใน App.jsx ผูก logic ว่า role ไหนเห็นเมนูอะไรกับ id
+// เหล่านี้ตรงๆ ตารางนี้แก้ได้แค่ label/emoji/img ไม่ใช่ที่ไว้เพิ่ม/ลบตำแหน่งงานใหม่
+const DEFAULT_ROLES = [
+  { id: "qc",            label: "ลานโหลด",             emoji: "🌡️", sortOrder: 1 },
+  { id: "checker",        label: "QC",                  emoji: "🥩", sortOrder: 2 },
+  { id: "loading",        label: "Checker",             img: "/basket.png", sortOrder: 3 },
+  { id: "office_wh",      label: "Office คลัง",          emoji: "🖨️", sortOrder: 4 },
+  { id: "office_plan",    label: "Office วางแผน",        emoji: "🧾", sortOrder: 5 },
+  { id: "lg",             label: "LG",                  emoji: "⬆️", sortOrder: 6 },
+  { id: "dashboard_only", label: "Dashboard",           sortOrder: 7 },
+  { id: "loading_data",   label: "ข้อมูลการโหลดสินค้า",  sortOrder: 8 },
+  { id: "tracking",       label: "Tracking การทำงาน",    emoji: "📊", sortOrder: 9 },
+  { id: "all",            label: "ทั้งหมด",              sortOrder: 10 },
+]
+export const roles = [...DEFAULT_ROLES]
+
+export async function loadRoles() {
+  try {
+    const { data, error } = await supabase.from("wh_roles").select("id, data")
+    if (error) throw error
+    const merged = [...DEFAULT_ROLES]
+    for (const row of data || []) {
+      // เฉพาะ id ที่มีอยู่แล้วในระบบเท่านั้น — role id ใหม่จะไม่มี routing รองรับ
+      const idx = merged.findIndex(r => r.id === row.id)
+      if (idx < 0) continue
+      const d = row.data || {}
+      merged[idx] = {
+        ...merged[idx],
+        label: d.label || merged[idx].label,
+        emoji: d.emoji ?? merged[idx].emoji,
+        img:   d.img   ?? merged[idx].img,
+      }
+    }
+    roles.length = 0
+    roles.push(...merged)
+  } catch (e) {
+    console.error("โหลด wh_roles ไม่สำเร็จ ใช้ default ในโค้ดไปก่อน:", e)
+  }
+}
+
+// แก้ได้เฉพาะ label/emoji/img ของ role ที่มีอยู่แล้วในระบบเท่านั้น (10 ตัว default)
+export async function saveRole(id, fields) {
+  if (!DEFAULT_ROLES.some(r => r.id === id)) throw new Error("เพิ่มตำแหน่งงานใหม่ไม่ได้ — แก้ได้เฉพาะตำแหน่งที่มีอยู่แล้ว")
+  const { label, emoji, img } = fields
+  const { error } = await supabase.from("wh_roles").upsert({ id, data: { label, emoji, img } })
+  if (error) throw error
+  const idx = roles.findIndex(r => r.id === id)
+  if (idx >= 0) roles[idx] = { ...roles[idx], label, emoji, img }
+}

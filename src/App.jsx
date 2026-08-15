@@ -28,7 +28,9 @@ import {
   laneAliases, saveLaneAlias, deleteLaneAlias,
   waitingReasons as waitingReasonPresets, addWaitingReason, deleteWaitingReason,
   basketTypes, saveBasketType, deleteBasketType,
-  detailSources, saveDetailSource, deleteDetailSource,
+  detailSources, saveDetailSource, deleteDetailSource, defaultDetailCols,
+  lanes, saveLane,
+  roles, saveRole,
 } from "./lib/masterData";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,12 +44,9 @@ import {
 // 7. วางแผน ออก Invoice → status: "invoiced"
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LOADING_LANES = [
-  { id: "lane_parts", label: "ลานโหลดชิ้นส่วน",       shortLabel: "ลานโหลดชิ้นส่วน", tinyLabel: "ชิ้นส่วน",     emoji: "🥩", color: "#f97316", bg: "#fff7ed", border: "#fed7aa" },
-  { id: "lane_head",  label: "ลานโหลดหัว/เครื่องใน",  shortLabel: "ลานโหลดหัว/เครื่องใน", tinyLabel: "หัว/เครื่องใน", emoji: "🐷", color: "#8b5cf6", bg: "#faf5ff", border: "#ddd6fe" },
-  { id: "lane_pork",  label: "ลานโหลดหมูซีก",          shortLabel: "ลานโหลดหมูซีก",        tinyLabel: "หมูซีก",        emoji: "🐖", color: "#e11d48", bg: "#fff1f2", border: "#fecdd3" },
-];
-
+// ลาน 3 ลานของระบบ (lane_parts/lane_head/lane_pork) — label/สี/emoji มาจาก wh_lanes
+// (ดู src/lib/masterData.js) ค่า default ในโค้ดคือ 3 บรรทัดข้างบนเดิม id คงที่เสมอเพราะ
+// ผูกกับ kiosk URL/routing ด้านล่างของไฟล์นี้โดยตรง
 const STATUS_META = {
   arrived:         { label: "เข้าโรงงานแล้ว",   color: "#3b82f6", bg: "#dbeafe", step: 1 },
   picking:         { label: "กำลังโหลด",          color: "#f97316", bg: "#ffedd5", step: 2 },
@@ -397,7 +396,7 @@ const PrintModal = ({ truck, type, onClose }) => {
     <Modal title={`🖨️ ${title}`} onClose={onClose}>
       <div style={{ border: "2px solid #111", borderRadius: 0, padding: 20, fontFamily: "monospace", fontSize: 13, lineHeight: 1.9 }}>
         <div style={{ textAlign: "center", fontWeight: 900, fontSize: 17, borderBottom: "2px solid #111", paddingBottom: 8, marginBottom: 14 }}>
-          🏭 โรงงานอาหารสด<br/><span style={{ fontSize: 14 }}>{title}</span>
+          🏭 {settings.facilityName}<br/><span style={{ fontSize: 14 }}>{title}</span>
         </div>
         <div>วันที่: {TODAY}</div>
         <div>เลขที่: {type.toUpperCase()}-{truck.id}-{Date.now().toString().slice(-4)}</div>
@@ -411,15 +410,15 @@ const PrintModal = ({ truck, type, onClose }) => {
         {type === "summary" && truck.qcLanes && (
           <div style={{ borderTop: "1px dashed #aaa", paddingTop: 10 }}>
             <b>อุณหภูมิ QC:</b>
-            {LOADING_LANES.map(l => <div key={l.id}>{l.shortLabel}: {truck.qcLanes[l.id]?.temp || "–"}°C</div>)}
+            {lanes.map(l => <div key={l.id}>{l.shortLabel}: {truck.qcLanes[l.id]?.temp || "–"}°C</div>)}
           </div>
         )}
         {type === "invoice" && (
           <div style={{ borderTop: "1px dashed #aaa", paddingTop: 10 }}>
-            <div>ราคาต่อหน่วย: 120.00 บาท</div>
-            <div>รวม: {(truck.qty * 120).toLocaleString()} บาท</div>
-            <div>VAT 7%: {Math.round(truck.qty * 120 * 0.07).toLocaleString()} บาท</div>
-            <div style={{ fontWeight: 900, fontSize: 15 }}>รวมทั้งสิ้น: {Math.round(truck.qty * 120 * 1.07).toLocaleString()} บาท</div>
+            <div>ราคาต่อหน่วย: {settings.unitPrice.toFixed(2)} บาท</div>
+            <div>รวม: {(truck.qty * settings.unitPrice).toLocaleString()} บาท</div>
+            <div>VAT {(settings.vatRate * 100).toFixed(0)}%: {Math.round(truck.qty * settings.unitPrice * settings.vatRate).toLocaleString()} บาท</div>
+            <div style={{ fontWeight: 900, fontSize: 15 }}>รวมทั้งสิ้น: {Math.round(truck.qty * settings.unitPrice * (1 + settings.vatRate)).toLocaleString()} บาท</div>
           </div>
         )}
         <div style={{ textAlign: "center", marginTop: 14, borderTop: "1px dashed #aaa", paddingTop: 10, fontSize: 11, color: "#666" }}>
@@ -528,7 +527,7 @@ const parseExitDatetime = (dateStr, timeStr) => {
 const calcTimeBarInfo = (exitTime, date) => {
   const exitDt = parseExitDatetime(date, exitTime);
   const remaining = exitDt ? Math.round((exitDt - Date.now()) / 60000) : 0;
-  const totalWindow = 240;
+  const totalWindow = settings.exitTimeWindowMinutes;
   const color = remaining > 60 ? "#22c55e" : remaining > 20 ? "#f59e0b" : "#ef4444";
   const fmtMins = m => { const a = Math.abs(m); return `${Math.floor(a/60)}:${String(a%60).padStart(2,"0")}`; };
   const label = remaining < 0 ? `เกิน ${fmtMins(remaining)} ชม.` : `เหลือ ${fmtMins(remaining)} ชม.`;
@@ -687,7 +686,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
             {visibleRows.map(({ key, date, plate, customerGroup, entryTime, exitTime, truck, assignedLanes }) => {
               const rem = getRemMins({ date, exitTime });
               const urgent = rem < settings.waitingUrgentMinutes && truck?.status !== "invoiced";
-              const anyQC = LOADING_LANES.some(l => truck?.qcLanes?.[l.id]?.done);
+              const anyQC = lanes.some(l => truck?.qcLanes?.[l.id]?.done);
               const mine = isMyPlate(plate);
               return (
                 <div key={key} style={{ background: urgent ? "#fff5f5" : mine ? "#eff6ff" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : mine ? "1.5px solid #bfdbfe" : "1px solid #f3f4f6" }}>
@@ -712,11 +711,11 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                       ? <span style={{ fontSize: 12, color: "#9ca3af", background: "#f9fafb", borderRadius: 0, padding: "4px 10px" }}>รอเช็คอิน</span>
                       : !anyQC
                       ? (assignedLanes?.size
-                          ? LOADING_LANES.filter(l => assignedLanes.has(l.id)).map(l => (
+                          ? lanes.filter(l => assignedLanes.has(l.id)).map(l => (
                               <span key={l.id} style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด {l.tinyLabel}</span>
                             ))
                           : <span style={{ fontSize: 12, color: "#6b7280", background: "#f3f4f6", borderRadius: 0, padding: "4px 10px", fontWeight: 600 }}>รอเข้าโหลด</span>)
-                      : LOADING_LANES.map(l => {
+                      : lanes.map(l => {
                           const loaded = truck.loadLanes?.[l.id]?.done;
                           const qcDone = truck.qcLanes?.[l.id]?.done;
                           const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
@@ -772,10 +771,10 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                         {!truck
                           ? <span style={{ fontSize: fs ? 16 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
                           : (() => {
-                              const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
+                              const anyQC = lanes.some(l => truck.qcLanes?.[l.id]?.done);
                               if (!anyQC) {
                                 if (!assignedLanes?.size) return <span style={{ fontSize: fs ? 16 : 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
-                                const pending = LOADING_LANES.filter(l => assignedLanes.has(l.id));
+                                const pending = lanes.filter(l => assignedLanes.has(l.id));
                                 return (
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 6 : 4 }}>
                                     {pending.map(l => (
@@ -788,7 +787,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                               }
                               return (
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: fs ? 6 : 4 }}>
-                                  {LOADING_LANES.map(l => {
+                                  {lanes.map(l => {
                                     const loaded = truck.loadLanes?.[l.id]?.done;
                                     const qcDone = truck.qcLanes?.[l.id]?.done;
                                     const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
@@ -874,7 +873,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) 
   const allRows = [
     ...dashQueueRows,
     ...walkIns.map(t => ({ key: t.id, date: t.date || "", plate: t.plate, customerGroup: t.customerGroup || "–", entryTime: t.entryTime || "", exitTime: t.exitTime || "", truck: t, assignedLanes: laneMatchForTruck(t, detailMap) })),
-  ].filter(row => row.customerGroup !== "CPFTH")
+  ].filter(row => !settings.excludedCustomerGroups.includes(row.customerGroup))
   .filter(row => !lane || !row.truck?.loadLanes?.[lane]?.done)
   .sort((a, b) => {
     const rank = row => {
@@ -885,7 +884,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) 
         const waiting = row.truck?.loadLanes?.[lane]?.waiting;
         if (qcDone || waiting) return 0;   // กำลังโหลดอยู่ → บนสุด
       } else {
-        const anyActive = LOADING_LANES.some(l =>
+        const anyActive = lanes.some(l =>
           row.truck?.qcLanes?.[l.id]?.done && !row.truck?.loadLanes?.[l.id]?.done
         );
         if (anyActive) return 0;           // กำลังโหลดอยู่ → บนสุด
@@ -919,20 +918,13 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) 
 };
 
 // ── 1. LG UPLOAD (Excel → parse → queue) ─────────────────────────────────────
-const COL_MAP = {
-  date:          ["วันที่","date"],
-  plate:         ["ทะเบียนรถ","ทะเบียน","plate"],
-  customerGroup: ["กลุ่มลูกค้า","customergroup"],
-  zone:          ["zone","โซน","ลาน"],
-  entryTime:     ["เวลารถเข้าโรงงาน","เวลาเข้าโรงงาน","เข้าโรงงาน","entrytime"],
-  exitTime:      ["เวลาออกจากโรงงาน","ออกจากโรงงาน","exittime"],
-};
-
+// header alias ต่อคอลัมน์มาจาก settings.lgColumnAliases (ดู src/lib/settings.js) —
+// เพิ่ม/แก้ alias ได้ผ่านหน้า Admin ไม่ต้องแก้โค้ดนี้
 const norm = (s) => String(s).normalize("NFC").toLowerCase().replace(/\s+/g, "").trim();
 
 const matchCol = (header) => {
   const h = norm(header);
-  for (const [field, aliases] of Object.entries(COL_MAP)) {
+  for (const [field, aliases] of Object.entries(settings.lgColumnAliases)) {
     if (aliases.some(a => h.includes(norm(a)))) return field;
   }
   return null;
@@ -1541,13 +1533,13 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
       if (t.summaryPrinted) return 3;            // เสร็จแล้ว → ล่าง
       const can3 = t.status === "arrived";
       const can6 = t.status === "picking" &&
-        LOADING_LANES.some(l => t.loadLanes?.[l.id]?.done) &&
-        !LOADING_LANES.some(l => t.qcLanes?.[l.id]?.done && !t.loadLanes?.[l.id]?.done);
+        lanes.some(l => t.loadLanes?.[l.id]?.done) &&
+        !lanes.some(l => t.qcLanes?.[l.id]?.done && !t.loadLanes?.[l.id]?.done);
       if (can3 || can6) return 0;                // กดได้เลย → บน
       return 2;                                  // รอขั้นตอนอื่น
     };
     return rank(a.truck) - rank(b.truck);
-  }).filter(row => row.customerGroup !== "CPFTH");
+  }).filter(row => !settings.excludedCustomerGroups.includes(row.customerGroup));
 
   const [searchQuery, setSearchQuery] = useState("");
   const filteredRows = allRows.filter(r => r.plate.includes(searchQuery));
@@ -1556,8 +1548,8 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
   const doneStep3 = t => t && ["picking","summary_printed","invoiced"].includes(t.status);
   const canStep6 = t =>
     t?.status === "picking" &&
-    LOADING_LANES.some(l => t.loadLanes?.[l.id]?.done) &&
-    !LOADING_LANES.some(l => t.qcLanes?.[l.id]?.done && !t.loadLanes?.[l.id]?.done);
+    lanes.some(l => t.loadLanes?.[l.id]?.done) &&
+    !lanes.some(l => t.qcLanes?.[l.id]?.done && !t.loadLanes?.[l.id]?.done);
   const doneStep6 = t => t && ["summary_printed","invoiced"].includes(t.status);
 
   const ExtraStatusCell = ({ truck }) => {
@@ -1611,12 +1603,12 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
 
   const StatusCell = ({ truck, compact }) => {
     if (!truck) return <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>รอเช็คอิน</span>;
-    const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
+    const anyQC = lanes.some(l => truck.qcLanes?.[l.id]?.done);
     if (!anyQC) return <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>;
     const fSize = compact ? 10 : 11;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: compact ? 3 : 5, alignItems: "center" }}>
-        {LOADING_LANES.map(l => {
+        {lanes.map(l => {
           const loaded = truck.loadLanes?.[l.id]?.done;
           const qcDone = truck.qcLanes?.[l.id]?.done;
           const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
@@ -1696,7 +1688,7 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
                 <tr style={{ background: "#f9fafb" }}>
                   {(isMobile
                     ? ["ทะเบียน","ลาน","เวลา / สถานะ","Action"]
-                    : ["ทะเบียน","กลุ่มลูกค้า", ...LOADING_LANES.map(l => l.tinyLabel), "เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"]
+                    : ["ทะเบียน","กลุ่มลูกค้า", ...lanes.map(l => l.tinyLabel), "เวลาเข้าโรงงาน","สถานะ","สถานะเพิ่มเติม","③ พิมพ์ใบเบิกสินค้า","⑥ พิมพ์ใบสรุปจ่าย"]
                   ).map(h => (
                     <th key={h} style={{ padding: isMobile ? "7px 6px" : "9px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>{h}</th>
                   ))}
@@ -1704,7 +1696,7 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
               </thead>
               <tbody>
                 {filteredRows.map(({ key, plate, customerGroup, entryTime, truck }) => {
-                  const lanes = laneMatchForTruck({ plate, customerGroup }, detailMapByChannel);
+                  const matchedLanes = laneMatchForTruck({ plate, customerGroup }, detailMapByChannel);
                   return isMobile ? (
                     <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
                       <td style={{ padding: "8px 6px", fontWeight: 800 }}>
@@ -1713,9 +1705,9 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
                       </td>
                       <td style={{ padding: "8px 6px" }}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          {LOADING_LANES.map(l => (
-                            <span key={l.id} style={{ fontSize: 10, fontWeight: 800, color: lanes.has(l.id) ? l.color : "#d1d5db" }}>
-                              {l.tinyLabel}{lanes.has(l.id) ? "✓" : ""}
+                          {lanes.map(l => (
+                            <span key={l.id} style={{ fontSize: 10, fontWeight: 800, color: matchedLanes.has(l.id) ? l.color : "#d1d5db" }}>
+                              {l.tinyLabel}{matchedLanes.has(l.id) ? "✓" : ""}
                             </span>
                           ))}
                         </div>
@@ -1736,9 +1728,9 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
                     <tr key={key} style={{ borderBottom: "1px solid #f3f4f6" }}>
                       <td style={{ padding: "10px 12px", fontWeight: 800 }}>{plate}</td>
                       <td style={{ padding: "10px 12px", color: "#374151" }}>{customerGroup}</td>
-                      {LOADING_LANES.map(l => (
+                      {lanes.map(l => (
                         <td key={l.id} style={{ padding: "10px 12px", textAlign: "center" }}>
-                          {lanes.has(l.id)
+                          {matchedLanes.has(l.id)
                             ? <span style={{ color: l.color, fontWeight: 900, fontSize: 16 }}>✓</span>
                             : <span style={{ color: "#e5e7eb" }}>—</span>}
                         </td>
@@ -1776,9 +1768,9 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
   const [uploading, setUploading] = useState(false);
 
   // รับทุกรถที่สถานะ "picking" (พิมพ์เบิกแล้ว)
-  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && t.customerGroup !== "CPFTH");
+  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
   const sel      = trucks.find(t => t.id === selId) || null;
-  const actLane  = LOADING_LANES.find(l => l.id === lane);
+  const actLane  = lanes.find(l => l.id === lane);
   const thisLaneQCd = sel?.qcLanes?.[lane]?.done;
 
   const handlePhoto = e => {
@@ -1815,7 +1807,7 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
 
       {flashLane && (
         <div style={{ padding: "13px 16px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
-          <Icon name="check" size={18} /> QC ผ่าน → พร้อมเข้า {LOADING_LANES.find(l => l.id === flashLane)?.label}
+          <Icon name="check" size={18} /> QC ผ่าน → พร้อมเข้า {lanes.find(l => l.id === flashLane)?.label}
         </div>
       )}
       {/* เลือกรถ */}
@@ -1843,7 +1835,7 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
             </div>
             {/* สรุป QC รายลาน */}
             <div style={{ display: "flex", gap: 6 }}>
-              {LOADING_LANES.map(l => {
+              {lanes.map(l => {
                 const qc = sel.qcLanes?.[l.id];
                 return (
                   <div key={l.id} style={{ flex: 1, background: qc?.done ? l.bg : "#f3f4f6", border: `1px solid ${qc?.done ? l.border : "#e5e7eb"}`, borderRadius: 0, padding: "6px 4px", textAlign: "center" }}>
@@ -1894,9 +1886,9 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && t.customerGroup !== "CPFTH");
+  const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
   const sel      = trucks.find(t => t.id === selId) || null;
-  const actLane  = LOADING_LANES.find(l => l.id === lane);
+  const actLane  = lanes.find(l => l.id === lane);
   const photos   = Array.isArray(photo) ? photo : (photo ? [photo] : []);
   const thisLaneChecked = sel?.sampleLanes?.[lane]?.done;
 
@@ -1960,7 +1952,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
             </div>
             {/* สรุปตรวจรายลาน */}
             <div style={{ display: "flex", gap: 6 }}>
-              {LOADING_LANES.map(l => {
+              {lanes.map(l => {
                 const sc = sel.sampleLanes?.[l.id];
                 return (
                   <div key={l.id} style={{ flex: 1, background: sc?.done ? l.bg : "#f3f4f6", border: `1px solid ${sc?.done ? l.border : "#e5e7eb"}`, borderRadius: 0, padding: "6px 4px", textAlign: "center" }}>
@@ -2016,7 +2008,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
     lane_pork:  { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
   });
   const setF = (lId, upd) => setForms(p => ({ ...p, [lId]: { ...p[lId], ...upd } }));
-  const curLane = LOADING_LANES.find(l => l.id === activeLane);
+  const curLane = lanes.find(l => l.id === activeLane);
   const form    = forms[activeLane];
   const setBasket = (key, val) => setF(activeLane, { baskets: { ...form.baskets, [key]: val } });
   const basketTotal = basketTypes.filter(b => b.countsInTotal).reduce((sum, b) => sum + (Number(form.baskets?.[b.key]) || 0), 0);
@@ -2043,7 +2035,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   // รถที่ QC ลานนี้ผ่านแล้ว และยังไม่ได้โหลดลานนี้
   const eligibleForLane = (laneId) => trucks.filter(t =>
     ["arrived", "picking"].includes(t.status) &&
-    t.customerGroup !== "CPFTH" &&
+    !settings.excludedCustomerGroups.includes(t.customerGroup) &&
     t.qcLanes?.[laneId]?.done &&
     !t.loadLanes?.[laneId]?.done
   );
@@ -2106,7 +2098,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
 
   const LaneSummary = ({ t }) => (
     <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
-      {LOADING_LANES.map(l => {
+      {lanes.map(l => {
         const qc  = t.qcLanes?.[l.id];
         const ld  = t.loadLanes?.[l.id];
         const bg  = ld?.done ? l.bg : qc?.done ? "#fef9c3" : "#f9fafb";
@@ -2294,7 +2286,7 @@ const buildLaneEvents = (list, sources) => {
   const events = [];
   for (const t of list || []) {
     for (const src of sources) {
-      for (const lane of LOADING_LANES) {
+      for (const lane of lanes) {
         const ld = t[src.field]?.[lane.id];
         if (ld?.done && ld?.doneAt) {
           events.push({
@@ -2360,7 +2352,7 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
   const latestLoadDoneAt = truckId => {
     const t = truckById.get(truckId);
     let latest = null;
-    for (const lane of LOADING_LANES) {
+    for (const lane of lanes) {
       const ld = t?.loadLanes?.[lane.id];
       if (ld?.done && ld?.doneAt && (latest == null || workTimeValue(ld.doneAt) > workTimeValue(latest))) latest = ld.doneAt;
     }
@@ -2534,7 +2526,7 @@ const BasketSummary = ({ trucks }) => {
     if (!t?.plate) continue;
     const key = plateNum(t.plate);
     if (!key) continue;
-    for (const l of LOADING_LANES) {
+    for (const l of lanes) {
       const ld = t.loadLanes?.[l.id];
       if (!ld?.baskets) continue;
       const cur = issuedByPlate[key] || { plate: t.plate, ...zeroBaskets() };
@@ -2593,11 +2585,11 @@ const BasketSummary = ({ trucks }) => {
 
   const totals = {};
   const payersByLane = {};
-  for (const l of LOADING_LANES) { totals[l.id] = zeroBaskets(); payersByLane[l.id] = new Set(); }
+  for (const l of lanes) { totals[l.id] = zeroBaskets(); payersByLane[l.id] = new Set(); }
 
   const detailRows = [];
   for (const t of sourceTrucks) {
-    for (const l of LOADING_LANES) {
+    for (const l of lanes) {
       const ld = t.loadLanes?.[l.id];
       if (!ld?.baskets) continue;
       for (const b of basketTypes) totals[l.id][b.key] += ld.baskets[b.key] || 0;
@@ -2616,15 +2608,15 @@ const BasketSummary = ({ trucks }) => {
     const summaryRows = [
       ...basketTypes.map(b => ({
         "สีตะกร้า": b.label,
-        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, totals[l.id][b.key] || 0])),
+        ...Object.fromEntries(lanes.map(l => [l.tinyLabel, totals[l.id][b.key] || 0])),
       })),
       {
         "สีตะกร้า": "รวมตะกร้า",
-        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, laneTotal(l)])),
+        ...Object.fromEntries(lanes.map(l => [l.tinyLabel, laneTotal(l)])),
       },
       {
         "สีตะกร้า": "ผู้จ่าย",
-        ...Object.fromEntries(LOADING_LANES.map(l => [l.tinyLabel, [...payersByLane[l.id]].join(", ") || ""])),
+        ...Object.fromEntries(lanes.map(l => [l.tinyLabel, [...payersByLane[l.id]].join(", ") || ""])),
       },
     ];
     const detailRowsForExport = filteredDetailRows.map(r => ({
@@ -2702,23 +2694,23 @@ const BasketSummary = ({ trucks }) => {
             <thead>
               <tr>
                 <th style={{ ...th, textAlign: "left" }}>สีตะกร้า</th>
-                {LOADING_LANES.map(l => <th key={l.id} style={{ ...th, color: l.color }}>{l.emoji} {l.tinyLabel}</th>)}
+                {lanes.map(l => <th key={l.id} style={{ ...th, color: l.color }}>{l.emoji} {l.tinyLabel}</th>)}
               </tr>
             </thead>
             <tbody>
               {basketTypes.map(b => (
                 <tr key={b.key}>
                   <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>{b.label}</td>
-                  {LOADING_LANES.map(l => <td key={l.id} style={td}>{totals[l.id][b.key] || 0}</td>)}
+                  {lanes.map(l => <td key={l.id} style={td}>{totals[l.id][b.key] || 0}</td>)}
                 </tr>
               ))}
               <tr>
                 <td style={{ ...td, textAlign: "left", fontWeight: 800, background: "#f9fafb" }}>รวมตะกร้า</td>
-                {LOADING_LANES.map(l => <td key={l.id} style={{ ...td, fontWeight: 800, background: "#f9fafb" }}>{laneTotal(l)}</td>)}
+                {lanes.map(l => <td key={l.id} style={{ ...td, fontWeight: 800, background: "#f9fafb" }}>{laneTotal(l)}</td>)}
               </tr>
               <tr>
                 <td style={{ ...td, textAlign: "left", fontWeight: 700, color: "#6b7280" }}>ผู้จ่าย</td>
-                {LOADING_LANES.map(l => <td key={l.id} style={{ ...td, fontSize: 12, color: "#6b7280" }}>{[...payersByLane[l.id]].join(", ") || "—"}</td>)}
+                {lanes.map(l => <td key={l.id} style={{ ...td, fontSize: 12, color: "#6b7280" }}>{[...payersByLane[l.id]].join(", ") || "—"}</td>)}
               </tr>
             </tbody>
           </table>
@@ -2834,7 +2826,7 @@ const WaitingSummary = ({ trucks }) => {
   // day only shows its most recent wait period here, not every one
   const rows = [];
   for (const t of sourceTrucks) {
-    for (const l of LOADING_LANES) {
+    for (const l of lanes) {
       const ld = t.loadLanes?.[l.id];
       if (!ld?.waiting || !ld.waitingAt) continue;
       const ongoing = !ld.done;
@@ -2965,7 +2957,7 @@ const Planning = ({ trucks, queue, onUpdate }) => {
       return 2;
     };
     return rank(a.truck) - rank(b.truck);
-  }).filter(row => row.customerGroup !== "CPFTH");
+  }).filter(row => !settings.excludedCustomerGroups.includes(row.customerGroup));
 
   const Tick = () => <span style={{ color: "#10b981", fontWeight: 700, fontSize: 13 }}>✓</span>;
   const Dash = () => <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
@@ -3021,13 +3013,13 @@ const Planning = ({ trucks, queue, onUpdate }) => {
                       {!truck
                         ? <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>รอเช็คอิน</span>
                         : (() => {
-                            const anyQC = LOADING_LANES.some(l => truck.qcLanes?.[l.id]?.done);
+                            const anyQC = lanes.some(l => truck.qcLanes?.[l.id]?.done);
                             return (
                               <div>
                                 {!anyQC
                                   ? <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>รอเข้าโหลด</span>
                                   : <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
-                                      {LOADING_LANES.map(l => {
+                                      {lanes.map(l => {
                                         const loaded = truck.loadLanes?.[l.id]?.done;
                                         const qcDone = truck.qcLanes?.[l.id]?.done;
                                         const waiting = truck.loadLanes?.[l.id]?.waiting && !loaded;
@@ -3179,6 +3171,21 @@ const Download = ({ onReset }) => {
   );
 };
 
+// ─── COLLAPSIBLE CARD (พับ/กางกล่องตั้งค่า — คลิกหัวข้อเพื่อเข้าไปแก้) ─────────────
+const Collapsible = ({ title, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "none", border: "none", padding: "16px 20px", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+        <span style={{ fontWeight: 800, fontSize: 14, color: "#111" }}>{title}</span>
+        <span style={{ fontSize: 12, color: "#9ca3af", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>▾</span>
+      </button>
+      {open && <div style={{ padding: "0 20px 16px" }}>{children}</div>}
+    </div>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM SETTINGS (wh_settings) — ค่าที่เคย hardcode ในโค้ด แก้ตรงนี้แทน
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3191,6 +3198,11 @@ const SystemSettings = () => {
     geofenceLat:          settings.geofence.lat,
     geofenceLng:          settings.geofence.lng,
     geofenceRadiusM:      settings.geofence.radiusM,
+    facilityName:            settings.facilityName,
+    unitPrice:               settings.unitPrice,
+    vatRate:                 settings.vatRate,
+    exitTimeWindowMinutes:   settings.exitTimeWindowMinutes,
+    excludedCustomerGroups:  settings.excludedCustomerGroups.join(", "),
   });
   const [saving, setSaving] = useState(false);
   const [msg,    setMsg]    = useState("");
@@ -3207,6 +3219,11 @@ const SystemSettings = () => {
         saveSetting("max_photo_uploads",      Number(form.maxPhotoUploads)),
         saveSetting("max_waiting_reasons",    Number(form.maxWaitingReasons)),
         saveSetting("geofence", { lat: Number(form.geofenceLat), lng: Number(form.geofenceLng), radiusM: Number(form.geofenceRadiusM) }),
+        saveSetting("facility_name",            form.facilityName),
+        saveSetting("unit_price",               Number(form.unitPrice)),
+        saveSetting("vat_rate",                 Number(form.vatRate)),
+        saveSetting("exit_time_window_minutes", Number(form.exitTimeWindowMinutes)),
+        saveSetting("excluded_customer_groups", form.excludedCustomerGroups.split(",").map(s => s.trim()).filter(Boolean)),
       ]);
       setMsg("✅ บันทึกการตั้งค่าสำเร็จ — มีผลทันทีในเซสชันนี้ เครื่องอื่นต้องรีเฟรชหน้าถึงจะเห็นค่าใหม่");
     } catch (e) {
@@ -3216,13 +3233,11 @@ const SystemSettings = () => {
     }
   };
 
-  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
   const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
   const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
 
   return (
-    <div style={card}>
-      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>⚙️ ตั้งค่าระบบ</div>
+    <Collapsible title="⚙️ ตั้งค่าระบบ">
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         <div>
           <label style={lbl}>เวลาตัดรอบวันทำงาน (0-23)</label>
@@ -3256,12 +3271,37 @@ const SystemSettings = () => {
           <input type="number" min="1" value={form.geofenceRadiusM} onChange={set("geofenceRadiusM")} style={inp} />
         </div>
       </div>
+      <div style={{ fontWeight: 700, fontSize: 12, color: "#6b7280", margin: "10px 0 6px" }}>🏭 ข้อมูลโรงงาน / เอกสาร</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>ชื่อโรงงาน (แสดงบนหัวจอและใบพิมพ์)</label>
+          <input value={form.facilityName} onChange={set("facilityName")} style={inp} placeholder="เช่น โรงงานพระพุทธบาท" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>ราคาต่อหน่วย (บาท) — ใบ Invoice</label>
+          <input type="number" min="0" step="any" value={form.unitPrice} onChange={set("unitPrice")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>อัตรา VAT (0-1, เช่น 0.07 = 7%)</label>
+          <input type="number" min="0" step="0.01" value={form.vatRate} onChange={set("vatRate")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>ช่วงเวลานับถอยหลังก่อนออกโรงงาน (นาที)</label>
+          <input type="number" min="1" value={form.exitTimeWindowMinutes} onChange={set("exitTimeWindowMinutes")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>กลุ่มลูกค้าที่ยกเว้นจาก Dashboard/คิว (คั่นด้วย ,)</label>
+          <input value={form.excludedCustomerGroups} onChange={set("excludedCustomerGroups")} style={inp} placeholder="เช่น CPFTH" />
+        </div>
+      </div>
       {msg && <div style={{ padding: "8px 10px", background: "#d1fae5", color: "#065f46", fontSize: 12, fontWeight: 700, marginBottom: 10 }}>{msg}</div>}
       <button onClick={save} disabled={saving}
         style={{ width: "100%", background: saving ? "#e5e7eb" : "#111", color: saving ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontWeight: 700, fontSize: 14, cursor: saving ? "default" : "pointer" }}>
         {saving ? "⏳ กำลังบันทึก..." : "💾 บันทึกการตั้งค่า"}
       </button>
-    </div>
+    </Collapsible>
   );
 };
 
@@ -3271,7 +3311,7 @@ const SystemSettings = () => {
 const LaneAliasSettings = () => {
   const [rows, setRows] = useState(() => Object.entries(laneAliases).map(([alias, laneKey]) => ({ alias, laneKey })));
   const [newAlias, setNewAlias] = useState("");
-  const [newLane, setNewLane] = useState(LOADING_LANES[0].id);
+  const [newLane, setNewLane] = useState(lanes[0].id);
   const [busy, setBusy] = useState(false);
 
   const refresh = () => setRows(Object.entries(laneAliases).map(([alias, laneKey]) => ({ alias, laneKey })));
@@ -3299,19 +3339,17 @@ const LaneAliasSettings = () => {
     }
   };
 
-  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
   const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
   const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
 
   return (
-    <div style={card}>
-      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>🏷️ ชื่อเรียกลานอื่นๆ (Lane Aliases)</div>
+    <Collapsible title="🏷️ ชื่อเรียกลานอื่นๆ (Lane Aliases)">
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>ใช้ตอนอัปโหลด Master แล้วคอลัมน์ "ลานโหลด" สะกดไม่ตรงกับที่ระบบรู้จัก — ไม่ต้องแก้โค้ด เพิ่มที่นี่ได้เลย</div>
       {rows.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           {rows.map(r => (
             <div key={r.alias} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
-              <span>"{r.alias}" → {LOADING_LANES.find(l => l.id === r.laneKey)?.tinyLabel || r.laneKey}</span>
+              <span>"{r.alias}" → {lanes.find(l => l.id === r.laneKey)?.tinyLabel || r.laneKey}</span>
               <button onClick={() => remove(r.alias)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 13 }}>🗑️ ลบ</button>
             </div>
           ))}
@@ -3325,7 +3363,7 @@ const LaneAliasSettings = () => {
         <div>
           <label style={lbl}>คือลาน</label>
           <select value={newLane} onChange={e => setNewLane(e.target.value)} style={inp}>
-            {LOADING_LANES.map(l => <option key={l.id} value={l.id}>{l.tinyLabel}</option>)}
+            {lanes.map(l => <option key={l.id} value={l.id}>{l.tinyLabel}</option>)}
           </select>
         </div>
         <button onClick={add} disabled={busy}
@@ -3333,7 +3371,7 @@ const LaneAliasSettings = () => {
           + เพิ่ม
         </button>
       </div>
-    </div>
+    </Collapsible>
   );
 };
 
@@ -3370,13 +3408,11 @@ const WaitingReasonSettings = () => {
     }
   };
 
-  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
   const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
   const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
 
   return (
-    <div style={card}>
-      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>💬 รายการเหตุผลรอสินค้า (fallback)</div>
+    <Collapsible title="💬 รายการเหตุผลรอสินค้า (fallback)">
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>ใช้เฉพาะตอนไฟล์ Master ไม่มีชื่อสินค้า match กับลานนั้นเลย — ปกติ dropdown จะดึงชื่อสินค้าจาก Master ก่อนเสมอ</div>
       {rows.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -3398,7 +3434,7 @@ const WaitingReasonSettings = () => {
           + เพิ่ม
         </button>
       </div>
-    </div>
+    </Collapsible>
   );
 };
 
@@ -3439,13 +3475,11 @@ const BasketTypeSettings = () => {
     }
   };
 
-  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
   const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
   const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
 
   return (
-    <div style={card}>
-      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>🧺 ประเภทตะกร้า/ตะขอ</div>
+    <Collapsible title="🧺 ประเภทตะกร้า/ตะขอ">
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>4 ตัวแรก (เหลืองใหญ่/เล็ก, เทา, ตะขอ) เป็น default ในระบบ ลบไม่ได้ — เพิ่มประเภทใหม่ได้ที่นี่ แต่ห้ามเปลี่ยน/ลบ "รหัส (key)" ที่มีข้อมูลบันทึกไว้แล้ว</div>
       {rows.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -3480,7 +3514,7 @@ const BasketTypeSettings = () => {
           + เพิ่ม
         </button>
       </div>
-    </div>
+    </Collapsible>
   );
 };
 
@@ -3489,7 +3523,8 @@ const BasketTypeSettings = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const DetailSourceSettings = () => {
   const [rows, setRows] = useState(() => [...detailSources]);
-  const emptyForm = { id: "", label: "", emoji: "📦", plateCol: "65", productCodeCol: "20", groupFlagCol: "11", matchKeywords: "" };
+  const dCols = defaultDetailCols();
+  const emptyForm = { id: "", label: "", emoji: "📦", plateCol: String(dCols.plateCol), productCodeCol: String(dCols.productCodeCol), groupFlagCol: String(dCols.groupFlagCol), matchKeywords: "" };
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
   const DEFAULT_IDS = ["wet_market", "modern_trade", "others"];
@@ -3529,13 +3564,11 @@ const DetailSourceSettings = () => {
     }
   };
 
-  const card = { background: "#fff", borderRadius: 0, padding: "16px 20px", marginBottom: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.07)" };
   const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
   const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
 
   return (
-    <div style={card}>
-      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>📦 ช่องทาง PO (Detail Sources)</div>
+    <Collapsible title="📦 ช่องทาง PO (Detail Sources)">
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
         3 ช่องทางแรก (ตลาดสด/Makro/LOTUS) เป็น default ในระบบ ลบไม่ได้ — เพิ่มช่องทางใหม่ได้ที่นี่ ถ้า retailer วางคอลัมน์ plate/รหัสสินค้า/กลุ่มลูกค้าในตำแหน่งไม่ตรงกับ default (65/20/11) ตั้งเลขคอลัมน์ (นับจาก 0) ให้ตรงได้เลย
       </div>
@@ -3559,11 +3592,11 @@ const DetailSourceSettings = () => {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
         <div>
           <label style={lbl}>รหัสช่องทาง (id, ภาษาอังกฤษ)</label>
-          <input value={form.id} onChange={set("id")} style={inp} placeholder="เช่น big_c" />
+          <input value={form.id} onChange={set("id")} style={inp} placeholder="เช่น makro" />
         </div>
         <div>
           <label style={lbl}>ชื่อที่แสดง</label>
-          <input value={form.label} onChange={set("label")} style={inp} placeholder="เช่น Big C" />
+          <input value={form.label} onChange={set("label")} style={inp} placeholder="เช่น Makro" />
         </div>
         <div>
           <label style={lbl}>Emoji</label>
@@ -3571,7 +3604,7 @@ const DetailSourceSettings = () => {
         </div>
         <div>
           <label style={lbl}>คำจับคู่กลุ่มลูกค้า (คั่นด้วย ,)</label>
-          <input value={form.matchKeywords} onChange={set("matchKeywords")} style={inp} placeholder="เช่น bigc, big c" />
+          <input value={form.matchKeywords} onChange={set("matchKeywords")} style={inp} placeholder="เช่น makro" />
         </div>
         <div>
           <label style={lbl}>คอลัมน์ทะเบียนรถ (0-based)</label>
@@ -3590,7 +3623,123 @@ const DetailSourceSettings = () => {
         style={{ width: "100%", background: busy ? "#e5e7eb" : "#111", color: busy ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 0", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer" }}>
         + เพิ่มช่องทาง
       </button>
-    </div>
+    </Collapsible>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANES (wh_lanes) — ป้ายชื่อ/สี/emoji ของลานโหลด
+// ─────────────────────────────────────────────────────────────────────────────
+const LaneSettings = () => {
+  const [rows, setRows] = useState(() => [...lanes]);
+  const [busy, setBusy] = useState(null);
+
+  const refresh = () => setRows([...lanes]);
+  const editField = (id, key) => (e) => setRows(rs => rs.map(r => r.id === id ? { ...r, [key]: e.target.value } : r));
+
+  const save = async (row) => {
+    setBusy(row.id);
+    try {
+      await saveLane(row.id, { label: row.label, shortLabel: row.shortLabel, tinyLabel: row.tinyLabel, emoji: row.emoji, color: row.color, bg: row.bg, border: row.border, sortOrder: row.sortOrder });
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <Collapsible title="🏭 ลานโหลด (Lanes)">
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
+        แก้ป้ายชื่อ/สี/emoji ของ 3 ลานได้ที่นี่ — รหัสลาน (id) เปลี่ยนไม่ได้เพราะผูกกับ QR/URL ที่พิมพ์ใช้งานอยู่แล้ว การเพิ่ม/ลดจำนวนลานต้องแก้โค้ดส่วน routing เพิ่มเติม
+      </div>
+      {rows.map(r => (
+        <div key={r.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr 56px auto", gap: 8, alignItems: "end", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+          <div>
+            <label style={lbl}>id</label>
+            <div style={{ fontSize: 12, color: "#9ca3af", padding: "9px 0" }}>{r.id}</div>
+          </div>
+          <div>
+            <label style={lbl}>ชื่อเต็ม</label>
+            <input value={r.label} onChange={editField(r.id, "label")} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>ชื่อสั้น</label>
+            <input value={r.tinyLabel} onChange={editField(r.id, "tinyLabel")} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>Emoji</label>
+            <input value={r.emoji} onChange={editField(r.id, "emoji")} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>สี</label>
+            <input type="color" value={r.color} onChange={editField(r.id, "color")} style={{ ...inp, padding: 2, height: 38 }} />
+          </div>
+          <button onClick={() => save(r)} disabled={busy === r.id}
+            style={{ background: busy === r.id ? "#e5e7eb" : "#111", color: busy === r.id ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: busy === r.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
+            💾 บันทึก
+          </button>
+        </div>
+      ))}
+    </Collapsible>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLES (wh_roles) — ป้ายชื่อ/emoji ของตำแหน่งงานในหน้าเลือกตำแหน่งงาน
+// ─────────────────────────────────────────────────────────────────────────────
+const RoleSettings = () => {
+  const [rows, setRows] = useState(() => [...roles]);
+  const [busy, setBusy] = useState(null);
+
+  const refresh = () => setRows([...roles]);
+  const editField = (id, key) => (e) => setRows(rs => rs.map(r => r.id === id ? { ...r, [key]: e.target.value } : r));
+
+  const save = async (row) => {
+    setBusy(row.id);
+    try {
+      await saveRole(row.id, { label: row.label, emoji: row.emoji, img: row.img });
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const lbl  = { display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 };
+  const inp  = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <Collapsible title="🧑‍💼 ตำแหน่งงาน (Roles)">
+      <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
+        แก้ป้ายชื่อ/emoji ของตำแหน่งงานได้ที่นี่ — รหัสตำแหน่ง (id) เปลี่ยนไม่ได้และเพิ่ม/ลบไม่ได้ เพราะผูกกับสิทธิ์เข้าถึงเมนูของแต่ละตำแหน่งในโค้ดโดยตรง
+      </div>
+      {rows.map(r => (
+        <div key={r.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 8, alignItems: "end", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+          <div>
+            <label style={lbl}>id</label>
+            <div style={{ fontSize: 12, color: "#9ca3af", padding: "9px 0" }}>{r.id}</div>
+          </div>
+          <div>
+            <label style={lbl}>ชื่อที่แสดง</label>
+            <input value={r.label} onChange={editField(r.id, "label")} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>Emoji</label>
+            <input value={r.emoji || ""} onChange={editField(r.id, "emoji")} style={inp} />
+          </div>
+          <button onClick={() => save(r)} disabled={busy === r.id}
+            style={{ background: busy === r.id ? "#e5e7eb" : "#111", color: busy === r.id ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: busy === r.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
+            💾 บันทึก
+          </button>
+        </div>
+      ))}
+    </Collapsible>
   );
 };
 
@@ -3657,7 +3806,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
       // merge lane-by-lane: T-1 (target) มีสิทธิ์ก่อน ถ้า T-1 ไม่มีค่อยเอาของ T-2
       const mergedQC   = { ...(src.qcLanes   || {}) };
       const mergedLoad = { ...(src.loadLanes  || {}) };
-      for (const l of LOADING_LANES) {
+      for (const l of lanes) {
         if (truck.qcLanes?.[l.id]?.done)   mergedQC[l.id]   = truck.qcLanes[l.id];
         if (truck.loadLanes?.[l.id]?.done)  mergedLoad[l.id] = truck.loadLanes[l.id];
       }
@@ -3709,7 +3858,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
             {duplicateTrucks.map(t => (
               <option key={t.id} value={t.id}>
                 {t.plate} · zone: {t.zone || "–"} · {STATUS_META[t.status]?.label || t.status}
-                {t.qcLanes ? ` · QC: ${LOADING_LANES.filter(l => t.qcLanes[l.id]?.done).map(l => l.tinyLabel).join(", ") || "ยังไม่มี"}` : ""}
+                {t.qcLanes ? ` · QC: ${lanes.filter(l => t.qcLanes[l.id]?.done).map(l => l.tinyLabel).join(", ") || "ยังไม่มี"}` : ""}
               </option>
             ))}
           </select>
@@ -3773,7 +3922,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
           {/* QC Lanes */}
           <div style={card}>
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🌡️ QC ลานโหลด</div>
-            {LOADING_LANES.map(l => {
+            {lanes.map(l => {
               const qc = form.qcLanes[l.id] || {};
               return (
                 <div key={l.id} style={{ borderRadius: 0, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
@@ -3804,7 +3953,7 @@ const Admin = ({ trucks, queue, onUpdate, onDeleteTruck }) => {
           {/* Load Lanes */}
           <div style={card}>
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>🏗️ สถานะลานโหลด</div>
-            {LOADING_LANES.map(l => {
+            {lanes.map(l => {
               const ld = form.loadLanes[l.id] || {};
               return (
                 <div key={l.id} style={{ borderRadius: 0, border: `1.5px solid ${l.border}`, background: l.bg, padding: "12px 14px", marginBottom: 10 }}>
@@ -4025,7 +4174,8 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
   // wh_detail_sources ต่อช่องทาง (แต่ละ retailer วางคอลัมน์ไม่ตรงกันได้ ปรับได้ที่ Admin)
   const parseSourceFile = (file, srcId) => {
     const src = detailSources.find(s => s.id === srcId) || {};
-    const plateCol = src.plateCol ?? 65, productCodeCol = src.productCodeCol ?? 20, groupFlagCol = src.groupFlagCol ?? 11;
+    const dCols = defaultDetailCols();
+    const plateCol = src.plateCol ?? dCols.plateCol, productCodeCol = src.productCodeCol ?? dCols.productCodeCol, groupFlagCol = src.groupFlagCol ?? dCols.groupFlagCol;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       let parsed;
@@ -4136,7 +4286,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {["ทะเบียนรถ", ...LOADING_LANES.map(l => l.tinyLabel)].map(h => (
+                  {["ทะเบียนรถ", ...lanes.map(l => l.tinyLabel)].map(h => (
                     <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -4145,7 +4295,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
                 {Object.entries(plateLaneMap).map(([plate, lanes]) => (
                   <tr key={plate} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "8px 16px", fontWeight: 800, fontFamily: "monospace" }}>{plate}</td>
-                    {LOADING_LANES.map(l => (
+                    {lanes.map(l => (
                       <td key={l.id} style={{ padding: "8px 16px", textAlign: "center" }}>
                         {lanes.has(l.id)
                           ? <span style={{ color: l.color, fontWeight: 800, fontSize: 16 }}>✓</span>
@@ -4243,8 +4393,8 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
         const nameColIdx = findCol("ProductNameTha");
         const codeColIdx0 = findCol("ProductBKey");
         const laneColIdx0 = findCol("ลานโหลด");
-        const codeColIdx = codeColIdx0 >= 0 ? codeColIdx0 : 1;
-        const laneColIdx = laneColIdx0 >= 0 ? laneColIdx0 : 4;
+        const codeColIdx = codeColIdx0 >= 0 ? codeColIdx0 : settings.masterFileFallbackCols.productCode;
+        const laneColIdx = laneColIdx0 >= 0 ? laneColIdx0 : settings.masterFileFallbackCols.lane;
         const dataRows = rows.slice(1).filter(r => r[codeColIdx] && String(r[codeColIdx]).trim() !== "" && String(r[codeColIdx]).trim() !== "SAP");
         const mapped = dataRows.map(r => ({
           productCode: normalizeProductCode(r[codeColIdx]),
@@ -4309,7 +4459,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
       <h2 style={{ margin: "0 0 20px", fontSize: 20, fontWeight: 900 }}>🗂️ Master Setting</h2>
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 20 }}>
-      <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20, border: "2px solid #111", flex: 1, minWidth: 320 }}>
+      <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", padding: 20, border: "2px solid #111", flex: 1, minWidth: 320, height: 220, overflowY: "auto", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <span style={{ fontSize: 28 }}>🗂️</span>
           <div>
@@ -4342,17 +4492,17 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
         )}
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 0, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", flex: 1, minWidth: 320 }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14 }}>
+      <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", flex: 1, minWidth: 320, height: 220, display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
           🕓 ประวัติการอัพโหลด <span style={{ background: "#111", color: "#fff", borderRadius: 0, padding: "2px 8px", fontSize: 11, marginLeft: 4 }}>{uploadLog.length}</span>
         </div>
         {uploadLog.length === 0
           ? <div style={{ padding: 30, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>ยังไม่มีประวัติการอัพโหลด</div>
           : (
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
-                  <tr style={{ background: "#f9fafb" }}>
+                  <tr style={{ background: "#f9fafb", position: "sticky", top: 0, zIndex: 1 }}>
                     <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>ไฟล์</th>
                     <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>วันที่/เวลา</th>
                     <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e5e7eb" }}></th>
@@ -4363,7 +4513,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
                 <tbody>
                   {uploadLog.map((h, i) => (
                     <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "8px 12px" }}>{h.fileName}</td>
+                      <td style={{ padding: "8px 12px", fontSize: 11 }}>{h.fileName}</td>
                       <td style={{ padding: "8px 12px", whiteSpace: "nowrap", color: "#6b7280" }}>
                         {h.uploadedAt ? new Date(h.uploadedAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "—"}
                       </td>
@@ -4380,7 +4530,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", color: h.matched === 0 ? "#dc2626" : "#065f46", fontWeight: 700 }}>
+                      <td style={{ padding: "8px 12px", textAlign: "center", color: h.matched === 0 ? "#dc2626" : "#065f46", fontWeight: 700, fontSize: 11 }}>
                         {h.matched}/{h.total}
                       </td>
                       <td style={{ padding: "8px 12px", textAlign: "center" }}>
@@ -4400,8 +4550,10 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
       </div>
       </div>
 
-      <div style={{ marginTop: 20, maxWidth: 640 }}>
+      <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
         <SystemSettings />
+        <LaneSettings />
+        <RoleSettings />
         <LaneAliasSettings />
         <WaitingReasonSettings />
         <BasketTypeSettings />
@@ -4946,18 +5098,8 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
 };
 
 // ─── ROLE SELECT (landing page: เลือกตำแหน่งงานก่อนเข้าระบบ) ──────────────────
-const ROLE_OPTIONS = [
-  { id: "qc",          label: "ลานโหลด",        emoji: "🌡️" },
-  { id: "checker",     label: "QC",            emoji: "🥩" },
-  { id: "loading",     label: "Checker",       img: "/basket.png" },
-  { id: "office_wh",   label: "Office คลัง",    emoji: "🖨️" },
-  { id: "office_plan", label: "Office วางแผน",  emoji: "🧾" },
-  { id: "lg",          label: "LG",            emoji: "⬆️" },
-  { id: "dashboard_only", label: "Dashboard" },
-  { id: "loading_data", label: "ข้อมูลการโหลดสินค้า" },
-  { id: "tracking",    label: "Tracking การทำงาน",  emoji: "📊" },
-  { id: "all",         label: "ทั้งหมด" },
-];
+// label/emoji/img ของแต่ละตำแหน่งงานมาจาก wh_roles (ดู src/lib/masterData.js) — id
+// คงที่เสมอเพราะ ROLE_TABS/LANE_SELECT_ROLES ผูก logic กับ id เหล่านี้ตรงๆ
 
 const LOADING_TABS = ["loading_parts", "loading_head", "loading_pork"];
 
@@ -4978,8 +5120,8 @@ const ROLE_TABS = {
 };
 
 const RoleSelect = ({ onSelect }) => {
-  const squareOptions = ROLE_OPTIONS.slice(0, 6);
-  const wideOptions   = ROLE_OPTIONS.slice(6);
+  const squareOptions = roles.slice(0, 6);
+  const wideOptions   = roles.slice(6);
   return (
     <div style={{ height: "100dvh", overflow: "hidden", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
       <div style={{ maxWidth: 420, width: "100%" }}>
@@ -5183,7 +5325,7 @@ export default function App() {
     if (upd.loadLanes) {
        for (const lane of Object.keys(upd.loadLanes)) {
          if (upd.loadLanes[lane].done && (!truck.loadLanes || !truck.loadLanes[lane] || !truck.loadLanes[lane].done)) {
-           const lName = LOADING_LANES.find(l => l.id === lane)?.tinyLabel || lane;
+           const lName = lanes.find(l => l.id === lane)?.tinyLabel || lane;
            const imgs = upd.loadLanes[lane].photos || [];
            sendTeamsNotification(`✅ โหลดเสร็จ — รถ ${truck.plate}`, { "ลานโหลด": lName, "เวลาโหลดเสร็จ": upd.loadLanes[lane].doneAt || TIME_NOW() }, imgs);
          }
@@ -5297,7 +5439,7 @@ export default function App() {
 
   // ── Lane select (เลือกเมนูย่อยหลังเลือกตำแหน่งงาน) ──
   if (!isKioskMode && role && !tab) {
-    const roleLabel = ROLE_OPTIONS.find(r => r.id === role)?.label || "";
+    const roleLabel = roles.find(r => r.id === role)?.label || "";
     return <LaneSelect tabs={visibleTabs} roleLabel={roleLabel} onSelect={setTab} onBack={handleChangeRole} />;
   }
 
@@ -5432,7 +5574,7 @@ export default function App() {
       <div style={{ background: "#111", color: "#fff", padding: "0 14px", position: "sticky", top: 0, zIndex: 100, height: 80, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: isMobile ? 1 : "none" }}>
           <div style={{ flexShrink: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้าโรงงานพระพุทธบาท</div>
+            <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 14, lineHeight: 1.2 }}>ระบบโหลดสินค้า{settings.facilityName}</div>
             {isNarrow && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{TODAY} {headerClock}</div>}
           </div>
           <select value={tab} onChange={e => {
@@ -5466,7 +5608,7 @@ export default function App() {
             </div>
           )}
         </div>
-        {!isNarrow && <div style={{ color: "#f9fafb", fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
+        {!isNarrow && <div style={{ color: "#f9fafb", fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{TODAY} {headerClock}</div>}
       </div>
       <div style={{ maxWidth: tab === "dashboard" || tab === "dashboard_transport" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" || tab === "dashboard_transport" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} myPlate={myPlate} />}
