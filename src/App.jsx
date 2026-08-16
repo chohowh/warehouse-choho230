@@ -1553,10 +1553,11 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
   const doneStep6 = t => t && ["summary_printed","invoiced"].includes(t.status);
 
   const ExtraStatusCell = ({ truck }) => {
-    if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
     const [isEditing, setIsEditing] = useState(false);
     const [val, setVal] = useState("");
     const [saving, setSaving] = useState(false);
+
+    if (!truck) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
 
     if (truck.extraStatus) {
       return (
@@ -5108,10 +5109,10 @@ const LANE_SELECT_ROLES = ["qc", "loading", "checker", "office_wh", "office_plan
 
 const ROLE_TABS = {
   qc:           ["qc_parts", "qc_head", "qc_pork"],
-  loading:      [...LOADING_TABS, "master_upload"],
+  loading:      [...LOADING_TABS],
   checker:      ["sample_parts", "sample_head", "sample_pork"],
   office_wh:    ["picking"],
-  office_plan:  ["planning", "master_upload", "detail_loading"],
+  office_plan:  ["planning", "detail_loading"],
   lg:           ["lg"],
   dashboard_only: ["dashboard", "dashboard_transport"],
   loading_data: ["overview_log"],
