@@ -4351,12 +4351,12 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(plateLaneMap).map(([plate, lanes]) => (
+                {Object.entries(plateLaneMap).map(([plate, plateLanes]) => (
                   <tr key={plate} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "8px 16px", fontWeight: 800, fontFamily: "monospace" }}>{plate}</td>
                     {lanes.map(l => (
                       <td key={l.id} style={{ padding: "8px 16px", textAlign: "center" }}>
-                        {lanes.has(l.id)
+                        {plateLanes.has(l.id)
                           ? <span style={{ color: l.color, fontWeight: 800, fontSize: 16 }}>✓</span>
                           : <span style={{ color: "#e5e7eb", fontSize: 14 }}>—</span>
                         }
