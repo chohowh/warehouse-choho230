@@ -228,8 +228,8 @@ const saveQrImage = async (url, mode) => {
 const QRCodePage = () => {
   const base = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
   const [zoomItem, setZoomItem] = useState(null);
-  const driverItems = QR_ITEMS.filter(i => i.mode === "driver");
-  const otherItems  = QR_ITEMS.filter(i => i.mode !== "driver");
+  const topRowItems = QR_ITEMS.filter(i => i.mode === "driver" || i.mode === "dashboard_transport");
+  const restItems    = QR_ITEMS.filter(i => i.mode !== "driver" && i.mode !== "dashboard_transport");
 
   const renderCard = ({ mode, emoji, label, color, bg }) => {
     const url = `${base}?mode=${mode}`;
@@ -269,13 +269,11 @@ const QRCodePage = () => {
           🖨️ พิมพ์ทั้งหมด
         </button>
       </div>
-      {driverItems.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
-          {driverItems.map(renderCard)}
-        </div>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
+        {topRowItems.map(renderCard)}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-        {otherItems.map(renderCard)}
+        {restItems.map(renderCard)}
       </div>
 
       {zoomItem && (() => {
@@ -3210,7 +3208,37 @@ const SystemSettings = () => {
 
   const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
 
+  // ตรวจช่วงค่าให้ตรงกับที่ SETTERS ใน lib/settings.js ยอมรับจริง — ถ้าไม่เช็คตรงนี้ก่อน
+  // กรอกค่านอกช่วง (เช่น ปล่อยว่าง lat/lng, ใส่ 24 ในเวลาตัดรอบ) จะเห็น "บันทึกสำเร็จ" ทั้งที่
+  // saveSetting เขียนลง DB ไปแล้วแต่ SETTERS ปฏิเสธเงียบๆ ไม่ update ค่าใน memory เลย
+  const validate = () => {
+    const n = v => Number(v);
+    if (!Number.isFinite(n(form.workDayCutoffHour)) || n(form.workDayCutoffHour) < 0 || n(form.workDayCutoffHour) >= 24)
+      return "เวลาตัดรอบวันทำงานต้องเป็นตัวเลข 0-23";
+    if (!Number.isFinite(n(form.waitingUrgentMinutes)) || n(form.waitingUrgentMinutes) <= 0)
+      return "นาทีที่ถึงจะขึ้น urgent ต้องมากกว่า 0";
+    if (!Number.isFinite(n(form.maxPhotoUploads)) || n(form.maxPhotoUploads) <= 0)
+      return "จำนวนรูปสูงสุดต้องมากกว่า 0";
+    if (!Number.isFinite(n(form.maxWaitingReasons)) || n(form.maxWaitingReasons) <= 0)
+      return "จำนวนเหตุผลรอสินค้าสูงสุดต้องมากกว่า 0";
+    if (!Number.isFinite(n(form.geofenceLat)) || !Number.isFinite(n(form.geofenceLng)) || String(form.geofenceLat).trim() === "" || String(form.geofenceLng).trim() === "")
+      return "Geofence lat/lng ต้องเป็นตัวเลข ห้ามเว้นว่าง";
+    if (!Number.isFinite(n(form.geofenceRadiusM)) || n(form.geofenceRadiusM) <= 0)
+      return "รัศมี geofence ต้องมากกว่า 0";
+    if (!form.facilityName.trim())
+      return "กรุณากรอกชื่อโรงงาน";
+    if (!Number.isFinite(n(form.unitPrice)) || n(form.unitPrice) < 0)
+      return "ราคาต่อหน่วยต้องไม่ติดลบ";
+    if (!Number.isFinite(n(form.vatRate)) || n(form.vatRate) < 0)
+      return "อัตรา VAT ต้องไม่ติดลบ";
+    if (!Number.isFinite(n(form.exitTimeWindowMinutes)) || n(form.exitTimeWindowMinutes) <= 0)
+      return "ช่วงเวลานับถอยหลังก่อนออกโรงงานต้องมากกว่า 0";
+    return "";
+  };
+
   const save = async () => {
+    const err = validate();
+    if (err) { setMsg(""); alert("บันทึกไม่ได้: " + err); return; }
     setSaving(true);
     setMsg("");
     try {
