@@ -4635,8 +4635,6 @@ const WT_GROUPS = [
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
 const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", exit: "#f8fafc" };
 
-const GRP_LANE = { parts: "lane_parts", head: "lane_head", pork: "lane_pork" };
-
 // ─── STAT TILE (Tracking summary cards) ──────────────────────────────────────
 // de-emphasis bars in a light tint of the tile's own accent hue, current (last) bar in full accent
 const Sparkline = ({ data, accent, height = 30, barWidth = 5, gap = 3 }) => {
@@ -4756,26 +4754,14 @@ const EntryStatTile = ({ icon, accent, title, count, prevCount, onTimePct, onTim
   </div>
 );
 
-const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] }) => {
+const WorkTracking = ({ trucks, queue }) => {
   const today = cycleDateStr();
   const [date, setDate]       = useState(today);
   const [archiveData, setArchiveData] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [prevArchiveData, setPrevArchiveData] = useState(null);
-  const [histDetailMapByChannel, setHistDetailMapByChannel] = useState(null); // for a past date being viewed
   const [sortCol, setSortCol] = useState("arrivedAt");
   const [sortDir, setSortDir] = useState(1);
-
-  // วันปัจจุบัน → ใช้ detailMap สด, วันย้อนหลัง → ดึงไฟล์ PO ของวันนั้นมาคำนวณใหม่
-  // (Master ลานโหลดไม่ได้เก็บย้อนหลัง จึงใช้ตัวปัจจุบันร่วมกับไฟล์ PO ของวันที่ดู)
-  const effectiveDetailMapByChannel = date === today ? detailMapByChannel : (histDetailMapByChannel || {});
-
-  // lane groups the truck's PO data says it does NOT need — cell gets blacked out
-  const irrelevantGrps = t => {
-    const lanes = laneMatchForTruck(t, effectiveDetailMapByChannel);
-    if (!lanes.size) return new Set();
-    return new Set(Object.keys(GRP_LANE).filter(g => !lanes.has(GRP_LANE[g])));
-  };
 
   useEffect(() => {
     setArchiveData(null);
@@ -4796,18 +4782,6 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
       .then(({ data }) => { if (!cancelled) setPrevArchiveData(data ?? null); });
     return () => { cancelled = true; };
   }, [date]);
-
-  useEffect(() => {
-    if (date === today) { setHistDetailMapByChannel(null); return; }
-    let cancelled = false;
-    fetchDetailSrc(date).then(remote => {
-      if (cancelled) return;
-      const rowsByChannel = {};
-      for (const src of detailSources) rowsByChannel[src.id] = remote?.[src.id]?.rows || [];
-      setHistDetailMapByChannel(buildDetailMapByChannel(masterLane, rowsByChannel));
-    });
-    return () => { cancelled = true; };
-  }, [date, today, masterLane]);
 
   const activeTrucks = archiveData?.trucks ?? (date === today ? trucks : []);
   const activeQueue  = archiveData?.queue  ?? (date === today ? queue  : []);
@@ -5128,11 +5102,6 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
                         );
-                      }
-
-                      // ลานที่ไม่เกี่ยวข้องกับทะเบียนนี้ (ตามข้อมูล PO ที่อัพโหลด) — ถมดำ
-                      if (GRP_LANE[col.grp] && irrelevantGrps(t).has(col.grp)) {
-                        return <td key={col.id} style={{ padding: "7px 10px", background: "#000", borderRight: "1px solid #e5e7eb" }} />;
                       }
 
                       // Generic time cell
