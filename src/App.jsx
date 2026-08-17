@@ -614,7 +614,7 @@ const exportArchiveExcel = async (dateStr) => {
 
 const LANE_LABEL = { lane_parts: "ลานชิ้นส่วน", lane_head: "ลานหัว/เครื่องใน", lane_pork: "ลานหมูซีก" };
 
-const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemMins, myPlate }) => {
+const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemMins, myPlate, simple = false }) => {
   const containerRef = useRef(null);
   const plateNum = s => (String(s).match(/\d+/g) || []).pop() || "";
   const isMyPlate = (plate) => !!myPlate && plateNum(plate) === plateNum(myPlate) && plateNum(myPlate) !== "";
@@ -686,8 +686,36 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
               const urgent = rem < settings.waitingUrgentMinutes && truck?.status !== "invoiced";
               const anyQC = lanes.some(l => truck?.qcLanes?.[l.id]?.done);
               const mine = isMyPlate(plate);
+              const cardStyle = { background: urgent ? "#fff5f5" : mine ? "#eff6ff" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : mine ? "1.5px solid #bfdbfe" : "1px solid #f3f4f6" };
+              if (simple) {
+                return (
+                  <div key={key} style={cardStyle}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ fontWeight: 900, fontSize: 22, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", background: "#f3f4f6", padding: "4px 10px" }}>{customerGroup || "—"}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#9ca3af", marginBottom: 4 }}>เวลาเข้าโรงงาน</div>
+                        <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: 16 }}>{entryTime || "—"}</div>
+                        <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 2 }}>{truck?.arrivedAt ? `เข้าจริง ${truck.arrivedAt}` : "ยังไม่เข้าโรงงาน"}</div>
+                      </div>
+                      <div style={{ width: 1, alignSelf: "stretch", background: "#e5e7eb" }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#9ca3af", marginBottom: 4 }}>เวลาออกจากโรงงาน</div>
+                        <TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={false} card hideBar />
+                      </div>
+                    </div>
+                    {exitTime && truck?.status !== "invoiced" && (
+                      <div style={{ marginTop: 12 }}>
+                        <TimeBarTrack exitTime={exitTime} date={date} done={truck?.status === "invoiced"} />
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               return (
-                <div key={key} style={{ background: urgent ? "#fff5f5" : mine ? "#eff6ff" : "#fff", borderRadius: 0, padding: "14px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: urgent ? "1.5px solid #fca5a5" : mine ? "1.5px solid #bfdbfe" : "1px solid #f3f4f6" }}>
+                <div key={key} style={cardStyle}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontWeight: 900, fontSize: 20, color: "#111", letterSpacing: 0.5 }}>{plate}</div>
@@ -738,10 +766,12 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
             })}
           </div>
         : <div style={{ overflowX: "auto", overflowY: "auto", flex: 1, maxHeight: fs ? undefined : "calc(100vh - 170px)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs ? 18 : 12, tableLayout: fs ? "fixed" : undefined }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs ? 18 : 12, tableLayout: (fs || simple) ? "fixed" : undefined }}>
               <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr style={{ background: "#f9fafb" }}>
-                  {(fs
+                  {(simple
+                    ? [{l:"ทะเบียน",w:"15%"},{l:"กลุ่มลูกค้า",w:"25%"},{l:"เวลาเข้าโรงงาน",w:"20%"},{l:"เวลาออกจากโรงงาน",w:"40%"}]
+                    : fs
                     ? [{l:"ทะเบียน",w:140},{l:"เวลาเข้าโรงงาน",w:160},{l:"เวลาออกจากโรงงาน",w:270},{l:"สถานะ",w:"auto"}]
                     : [{l:"ทะเบียน",w:60},{l:"กลุ่มลูกค้า",w:100},{l:"เวลาเข้าโรงงาน",w:90},{l:"เวลาออกจากโรงงาน",w:200},{l:"สถานะ",w:"auto"},{l:"ใบเบิกสินค้า",w:60},{l:"ใบสรุปจ่าย",w:60},{l:"ใบ Invoice",w:60}]
                   ).map(h => (
@@ -757,7 +787,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                   return (
                     <tr key={key} className={urgent ? "row-urgent" : ""} style={{ borderBottom: "1px solid #f3f4f6", background: mine ? "#eff6ff" : undefined }}>
                       <td style={{ padding: tdP, fontWeight: 800, fontSize: fs ? 22 : undefined }}>{plate}</td>
-                      {!fs && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
+                      {(!fs || simple) && <td style={{ padding: tdP, color: "#374151", maxWidth: 100, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customerGroup}</td>}
                       <td style={{ padding: tdP, whiteSpace: "nowrap", verticalAlign: "top" }}>
                         <div style={{ fontWeight: 700, color: "#3b82f6", fontSize: fs ? 16 : 13, lineHeight: "18px" }}>{entryTime || "—"}</div>
                         {truck?.arrivedAt
@@ -765,7 +795,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                           : <div style={{ fontSize: fs ? 13 : 10, color: "#6b7280", marginTop: 2, lineHeight: "16px" }}>(รถยังไม่เข้าโรงงาน)</div>}
                       </td>
                       <td style={{ padding: tdP, verticalAlign: "top" }}><TimeBar exitTime={exitTime} date={date} done={truck?.status === "invoiced"} invoicedAt={truck?.invoicedAt} fs={fs} /></td>
-                      <td style={{ padding: tdP }}>
+                      {!simple && <td style={{ padding: tdP }}>
                         {!truck
                           ? <span style={{ fontSize: fs ? 16 : 11, color: "#9ca3af" }}>รอเช็คอิน</span>
                           : (() => {
@@ -818,10 +848,10 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
                             <span style={{ display: "inline-block", background: "#fee2e2", color: "#991b1b", borderRadius: 0, padding: fs ? "3px 10px" : "2px 8px", fontSize: fs ? 14 : 10, fontWeight: 700 }}>⚠️ {truck.extraStatus}</span>
                           </div>
                         )}
-                      </td>
-                      {!fs && <td style={{ padding: tdP }}>{truck?.pickupPrinted ? <Tick/> : <Dash/>}</td>}
-                      {!fs && <td style={{ padding: tdP }}>{truck?.summaryPrinted ? <Tick/> : <Dash/>}</td>}
-                      {!fs && <td style={{ padding: tdP }}>{truck?.status === "invoiced" ? <Tick/> : <Dash/>}</td>}
+                      </td>}
+                      {!fs && !simple && <td style={{ padding: tdP }}>{truck?.pickupPrinted ? <Tick/> : <Dash/>}</td>}
+                      {!fs && !simple && <td style={{ padding: tdP }}>{truck?.summaryPrinted ? <Tick/> : <Dash/>}</td>}
+                      {!fs && !simple && <td style={{ padding: tdP }}>{truck?.status === "invoiced" ? <Tick/> : <Dash/>}</td>}
                     </tr>
                   );
                 })}
@@ -833,7 +863,7 @@ const TruckTable = ({ visibleRows, allRows, searchPlate, setSearchPlate, getRemM
   );
 };
 
-const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) => {
+const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate, simple = false }) => {
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
   const [searchPlate, setSearchPlate] = useState("");
   const isMobile = useIsMobile();
@@ -909,7 +939,7 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate }) 
       </div>
 
       <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden", marginTop: 8 }}>
-        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} myPlate={myPlate} />
+        <TruckTable visibleRows={visibleRows} allRows={allRows} searchPlate={searchPlate} setSearchPlate={setSearchPlate} getRemMins={getRemMins} myPlate={myPlate} simple={simple} />
       </div>
     </div>
   );
@@ -5490,7 +5520,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
         <KioskHeader emoji="📊" title="Dashboard ขนส่ง" color="#0ea5e9" />
         <div style={{ padding: isMobile ? "8px 10px 80px" : "8px 14px 14px" }}>
-          <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} />
+          <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} simple />
         </div>
       </div>
     );
@@ -5641,7 +5671,7 @@ export default function App() {
       </div>
       <div style={{ maxWidth: tab === "dashboard" || tab === "dashboard_transport" || tab === "work_tracking" ? "none" : tab === "picking" ? 1400 : 960, margin: "0 auto", padding: tab === "dashboard" || tab === "dashboard_transport" ? (isMobile ? "8px 10px 80px" : "8px 14px 14px") : (isMobile ? "16px 12px 80px" : "20px 14px 100px") }}>
         {tab === "dashboard" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={dashLane === "main" ? null : dashLane} detailMap={detailMapByChannel} myPlate={myPlate} />}
-        {tab === "dashboard_transport" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} />}
+        {tab === "dashboard_transport" && <Dashboard trucks={trucks} queue={queue} onReset={handleReset} lane={null} detailMap={detailMapByChannel} title="Dashboard ขนส่ง" myPlate={myPlate} simple />}
         {tab === "basket_summary" && <BasketSummary trucks={trucks} />}
         {tab === "waiting_summary" && <WaitingSummary trucks={trucks} />}
         {tab === "qr"        && <QRCodePage />}
