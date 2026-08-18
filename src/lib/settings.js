@@ -16,14 +16,6 @@ export const settings = {
   exitTimeWindowMinutes:   240,
   excludedCustomerGroups:  ["CPFTH"],
   enableBaySelection:      true,
-  lgColumnAliases: {
-    date:          ["วันที่","date"],
-    plate:         ["ทะเบียนรถ","ทะเบียน","plate"],
-    customerGroup: ["กลุ่มลูกค้า","customergroup"],
-    zone:          ["zone","โซน","ลาน"],
-    entryTime:     ["เวลารถเข้าโรงงาน","เวลาเข้าโรงงาน","เข้าโรงงาน","entrytime"],
-    exitTime:      ["เวลาออกจากโรงงาน","ออกจากโรงงาน","exittime"],
-  },
   masterFileFallbackCols:  { productCode: 1, lane: 4 },
 }
 
@@ -39,7 +31,6 @@ const SETTERS = {
   exit_time_window_minutes: v => { const n = Number(v); if (Number.isFinite(n) && n > 0) settings.exitTimeWindowMinutes = n; },
   excluded_customer_groups: v => { if (Array.isArray(v)) settings.excludedCustomerGroups = v.filter(x => typeof x === "string"); },
   enable_bay_selection:     v => { settings.enableBaySelection = !!v; },
-  lg_column_aliases:        v => { if (v && typeof v === "object") settings.lgColumnAliases = { ...settings.lgColumnAliases, ...v }; },
   master_file_fallback_cols: v => { if (v && typeof v === "object") settings.masterFileFallbackCols = { ...settings.masterFileFallbackCols, ...v }; },
 }
 

@@ -947,16 +947,16 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate, si
 };
 
 // ── 1. LG UPLOAD (Excel → parse → queue) ─────────────────────────────────────
-// header alias ต่อคอลัมน์มาจาก settings.lgColumnAliases (ดู src/lib/settings.js) —
-// เพิ่ม/แก้ alias ได้ผ่านหน้า Admin ไม่ต้องแก้โค้ดนี้
-const norm = (s) => String(s).normalize("NFC").toLowerCase().replace(/\s+/g, "").trim();
-
-const matchCol = (header) => {
-  const h = norm(header);
-  for (const [field, aliases] of Object.entries(settings.lgColumnAliases)) {
-    if (aliases.some(a => h.includes(norm(a)))) return field;
-  }
-  return null;
+// ตำแหน่งคอลัมน์ในไฟล์ Excel ล็อคตายตัว (ไม่อ่านจากชื่อ header) — ข้อมูลเริ่มแถวที่ 3
+// K=วันที่ D=ทะเบียนรถ AS=กลุ่มลูกค้า L=Zone M=เวลาเข้าโรงงาน N=เวลาออกจากโรงงาน
+const LG_UPLOAD_DATA_START_ROW = 2; // แถวที่ 3 (index 0-based)
+const LG_UPLOAD_COLS = {
+  date:          10, // K
+  plate:         3,  // D
+  customerGroup: 44, // AS
+  zone:          11, // L
+  entryTime:     12, // M
+  exitTime:      13, // N
 };
 
 const parseQueueDateToISO = (dateStr) => {
@@ -980,8 +980,13 @@ const toDateStr = (val) => {
 
 const toHHMM = (val) => {
   if (val === "" || val == null) return "";
-  // already looks like time string
-  if (typeof val === "string" && /^\d{1,2}:\d{2}/.test(val.trim())) return val.trim().slice(0,5);
+  // string containing a time — either bare "17:00[:00]" or a full "16/08/2569 17:00:00" datetime
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    const m = trimmed.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (m) return `${m[1].padStart(2, "0")}:${m[2]}`;
+    if (trimmed.includes("/")) return ""; // date-only string (no time part) — don't misread as a serial number
+  }
   // Excel stores time as fraction of a day (0.875 = 21:00)
   const num = typeof val === "number" ? val : parseFloat(val);
   if (!isNaN(num)) {
@@ -1078,35 +1083,24 @@ const LGUpload = ({ queue, onSetQueue }) => {
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
 
-        if (rows.length < 2) throw new Error("ไม่พบข้อมูลในไฟล์");
+        if (rows.length <= LG_UPLOAD_DATA_START_ROW) throw new Error("ไม่พบข้อมูลในไฟล์");
 
-        // หา header row จริง (row แรกที่มี column match ได้ >= 2 ช่อง)
-        let headerIdx = 0;
-        for (let i = 0; i < Math.min(rows.length, 15); i++) {
-          if (rows[i].filter(h => matchCol(h) !== null).length >= 2) { headerIdx = i; break; }
-        }
-        // map headers — แต่ละ field ใช้ column แรกที่เจอเท่านั้น
-        const seenFields = new Set();
-        const headers = rows[headerIdx].map(matchCol).map(f => {
-          if (!f || seenFields.has(f)) return null;
-          seenFields.add(f);
-          return f;
-        });
-
-        const timeFields = new Set(["entryTime","exitTime"]);
-        const dateFields = new Set(["date"]);
         const trucks = [];
-        for (let i = headerIdx + 1; i < rows.length; i++) {
+        for (let i = LG_UPLOAD_DATA_START_ROW; i < rows.length; i++) {
           const row = rows[i];
-          const obj = {};
-          headers.forEach((field, ci) => {
-            if (!field) return;
-            obj[field] = timeFields.has(field) ? toHHMM(row[ci]) : dateFields.has(field) ? toDateStr(row[ci]) : String(row[ci] ?? "").trim();
+          const plate = String(row[LG_UPLOAD_COLS.plate] ?? "").trim();
+          if (!plate) continue;
+          trucks.push({
+            date:          toDateStr(row[LG_UPLOAD_COLS.date]),
+            plate,
+            customerGroup: String(row[LG_UPLOAD_COLS.customerGroup] ?? "").trim(),
+            zone:          String(row[LG_UPLOAD_COLS.zone] ?? "").trim(),
+            entryTime:     toHHMM(row[LG_UPLOAD_COLS.entryTime]),
+            exitTime:      toHHMM(row[LG_UPLOAD_COLS.exitTime]),
           });
-          if (obj.plate) trucks.push(obj);
         }
 
-        if (trucks.length === 0) throw new Error("ไม่พบข้อมูลทะเบียนรถ — ตรวจสอบชื่อ column");
+        if (trucks.length === 0) throw new Error("ไม่พบข้อมูลทะเบียนรถ — ตรวจสอบว่าคอลัมน์ D มีเลขทะเบียนตั้งแต่แถวที่ 3");
         setExtracted(trucks);
         setStatus("preview");
       } catch (err) {
