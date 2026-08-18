@@ -1807,7 +1807,7 @@ const BaySelect = ({ laneId, actLane, title, onSelect, onBack }) => {
         </div>
         {onBack && (
           <button onClick={onBack} style={{ marginTop: 24, width: "100%", background: "transparent", border: "none", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "center" }}>
-            ← กลับหน้าเลือกลานโหลด
+            ← กลับ
           </button>
         )}
       </div>
@@ -4612,12 +4612,22 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
 };
 
 // ─── MASTER UPLOAD (แยกออกมาจาก Detail Loading ให้มีหน้าของตัวเอง) ──────────
+const MASTER_SETTING_PIN = "0000";
+
 const MasterUpload = ({ masterLane, onMasterChange }) => {
   const [fileName, setFileName] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wh_detail_names") || "{}").master || ""; } catch { return ""; }
   });
   const [masterDebug, setMasterDebug] = useState(null); // { total, matched, sampleCol3 }
   const [uploadLog, setUploadLog] = useState([]);
+  const [unlocked,   setUnlocked]   = useState(false);
+  const [pinInput,   setPinInput]   = useState("");
+  const [pinError,   setPinError]   = useState(false);
+
+  const checkPin = () => {
+    if (pinInput === MASTER_SETTING_PIN) { setUnlocked(true); setPinError(false); }
+    else { setPinError(true); setPinInput(""); }
+  };
 
   useEffect(() => {
     supabase.from("wh_master_upload_log").select("id, data").then(({ data }) => {
@@ -4708,6 +4718,33 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
       if (error) alert("ลบไม่สำเร็จ: " + error.message);
     }
   };
+
+  if (!unlocked) {
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+        <div style={{ maxWidth: 320, width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🔒</div>
+          <h2 style={{ fontWeight: 900, fontSize: 18, margin: "0 0 4px" }}>Master Setting</h2>
+          <p style={{ color: "#6b7280", fontSize: 12, margin: "0 0 20px" }}>กรุณาใส่รหัสผ่านก่อนเข้าแก้ไข</p>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={pinInput}
+            onChange={e => { setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4)); setPinError(false); }}
+            onKeyDown={e => { if (e.key === "Enter") checkPin(); }}
+            placeholder="••••"
+            autoFocus
+            style={{ width: "100%", textAlign: "center", fontSize: 26, letterSpacing: 8, border: `2px solid ${pinError ? "#dc2626" : "#e5e7eb"}`, borderRadius: 0, padding: "12px 0", outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+          />
+          {pinError && <div style={{ color: "#dc2626", fontSize: 12, fontWeight: 700, marginBottom: 12 }}>รหัสไม่ถูกต้อง</div>}
+          <button onClick={checkPin} style={{ width: "100%", background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+            ยืนยัน
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 20 }}>
@@ -5462,8 +5499,9 @@ export default function App() {
     return (allowed && !allowed.includes("dashboard")) ? allowed[0] : "dashboard";
   };
   const [role,       setRole]       = useState("");
-  const handleSelectRole = (r) => { setRole(r); setTab(defaultTabForRole(r)); };
-  const handleChangeRole = () => { setRole(""); setTab("dashboard"); };
+  const [prevTab,    setPrevTab]    = useState(null); // tab to return to when backing out of ช่องโหลด selection
+  const handleSelectRole = (r) => { setRole(r); setTab(defaultTabForRole(r)); setPrevTab(null); };
+  const handleChangeRole = () => { setRole(""); setTab("dashboard"); setPrevTab(null); };
   const [queue,      setQueue]      = useState([]);
   const [trucks,     setTrucks]     = useState([]);
   const [masterLane, setMasterLane] = useState(() => {
@@ -5836,7 +5874,7 @@ export default function App() {
           <select value={tab} onChange={e => {
               const v = e.target.value;
               if (v === "__change_role__") { handleChangeRole(); return; }
-              setTab(v); setDashLane("main");
+              setPrevTab(tab); setTab(v); setDashLane("main");
             }}
             style={{ flex: "none", background: "#1f2937", color: "#f9fafb", border: "1px solid #374151", borderRadius: 0, padding: isMobile ? "6px 10px" : "6px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", marginLeft: isMobile ? "auto" : 6 }}>
             {visibleTabs.map(t => {
@@ -5875,15 +5913,15 @@ export default function App() {
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
         {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMapByChannel={detailMapByChannel} />}
-        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
-        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
-        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
-        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} onBack={() => setTab(null)} />}
-        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} onBack={() => setTab(null)} />}
-        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} onBack={() => setTab(null)} />}
-        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
-        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
-        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
+        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
+        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
+        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} onBack={() => setTab(prevTab)} />}
+        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} onBack={() => setTab(prevTab)} />}
+        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} onBack={() => setTab(prevTab)} />}
+        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
+        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
+        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
         {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} detailMapByChannel={detailMapByChannel} masterLane={masterLane} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
