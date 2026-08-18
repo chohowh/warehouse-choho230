@@ -255,6 +255,90 @@ export async function deleteLane(id) {
   if (idx >= 0) lanes.splice(idx, 1)
 }
 
+// ── Bays (wh_bays) ───────────────────────────────────────────────────────────
+// ช่องโหลดย่อยภายในแต่ละลาน (ชิ้นส่วน 7 ช่อง / หัวเครื่องใน 2 ช่อง / หมูซีก 4 ช่อง เป็น
+// default) — เปิด/ปิดการบังคับเลือกช่องโหลดทั้งระบบได้ที่ settings.enableBaySelection
+// (wh_settings, key enable_bay_selection) ปิดแล้วหน้า QC/QC สุ่ม/Checker จะข้ามหน้าเลือก
+// ช่องไปเข้าฟอร์มเลย ไม่บันทึก bayId ลง DB
+// id คงที่ตลอดอายุระบบเพราะผูกกับ qcLanes/sampleLanes/loadLanes[...].bayId ที่บันทึกไว้
+// แล้ว — เพิ่ม/ลบ/แก้ชื่อได้อิสระต่อลาน แต่ deleteBay กันไว้ไม่ให้ลบช่องสุดท้ายของลานนั้น
+const DEFAULT_BAYS = [
+  ...Array.from({ length: 7 }, (_, i) => ({ id: `lane_parts_bay_${i + 1}`, laneId: "lane_parts", label: `ช่องโหลด ${i + 1}`, sortOrder: i + 1 })),
+  ...Array.from({ length: 2 }, (_, i) => ({ id: `lane_head_bay_${i + 1}`,  laneId: "lane_head",  label: `ช่องโหลด ${i + 1}`, sortOrder: i + 1 })),
+  ...Array.from({ length: 4 }, (_, i) => ({ id: `lane_pork_bay_${i + 1}`,  laneId: "lane_pork",  label: `ช่องโหลด ${i + 1}`, sortOrder: i + 1 })),
+]
+export const bays = [...DEFAULT_BAYS]
+
+export async function loadBays() {
+  try {
+    const { data, error } = await supabase.from("wh_bays").select("id, data")
+    if (error) throw error
+    // แถวที่ data.deleted=true คือ tombstone ของ default bay ที่ถูกลบ (ดู deleteBay) —
+    // ต้อง apply ก่อน merge เพราะ default ตัวนั้นจะไม่มีแถวจริงให้ .delete() ลบได้เลย
+    const deletedDefaults = new Set((data || []).filter(r => r.data?.deleted).map(r => r.id))
+    const merged = DEFAULT_BAYS.filter(b => !deletedDefaults.has(b.id))
+    for (const row of data || []) {
+      if (row.data?.deleted) continue
+      const d = row.data || {}
+      const base = merged.find(b => b.id === row.id)
+      const laneId = d.laneId || base?.laneId
+      if (!laneId) continue // ไม่รู้จะผูกกับลานไหน ข้ามแถวนี้
+      const entry = {
+        id: row.id,
+        laneId,
+        label: d.label || base?.label || row.id,
+        sortOrder: Number.isFinite(d.sortOrder) ? d.sortOrder : (base?.sortOrder ?? 0),
+      }
+      const idx = merged.findIndex(b => b.id === entry.id)
+      if (idx >= 0) merged[idx] = entry; else merged.push(entry)
+    }
+    bays.length = 0
+    bays.push(...merged)
+  } catch (e) {
+    console.error("โหลด wh_bays ไม่สำเร็จ ใช้ default ในโค้ดไปก่อน:", e)
+  }
+}
+
+export async function addBay(laneId, label) {
+  const trimmed = (label || "").trim()
+  if (!trimmed) throw new Error("กรุณากรอกชื่อช่องโหลด")
+  const id = `${laneId}_bay_${Date.now()}`
+  const sortOrder = Date.now()
+  const { error } = await supabase.from("wh_bays").insert({ id, data: { laneId, label: trimmed, sortOrder } })
+  if (error) throw error
+  bays.push({ id, laneId, label: trimmed, sortOrder })
+}
+
+export async function saveBay(id, label) {
+  const trimmed = (label || "").trim()
+  if (!trimmed) throw new Error("กรุณากรอกชื่อช่องโหลด")
+  const row = bays.find(b => b.id === id)
+  if (!row) throw new Error("ไม่พบช่องโหลดนี้")
+  const { error } = await supabase.from("wh_bays").upsert({ id, data: { laneId: row.laneId, label: trimmed, sortOrder: row.sortOrder } })
+  if (error) throw error
+  row.label = trimmed
+}
+
+// ต้องเหลืออย่างน้อย 1 ช่องต่อลานเสมอ กันหน้าเลือกช่องโหลดของลานนั้นว่างเปล่า
+export async function deleteBay(id) {
+  const row = bays.find(b => b.id === id)
+  if (!row) return
+  const remaining = bays.filter(b => b.laneId === row.laneId && b.id !== id)
+  if (remaining.length === 0) throw new Error("ต้องเหลืออย่างน้อย 1 ช่องโหลดต่อลาน")
+  if (DEFAULT_BAYS.some(b => b.id === id)) {
+    // default bay ไม่มีแถวจริงใน wh_bays เสมอไป (ถ้าไม่เคยแก้ชื่อ) — .delete() ธรรมดาจะไม่ error
+    // แต่ก็ไม่ลบอะไรจริง แล้ว DEFAULT_BAYS จะทำให้ช่องนี้โผล่กลับมาใหม่ทุกครั้งที่ loadBays()
+    // ต้องฝัง tombstone แทนเพื่อให้ loadBays() รู้ว่าต้องข้าม default id นี้ไปตลอด
+    const { error } = await supabase.from("wh_bays").upsert({ id, data: { deleted: true, laneId: row.laneId } })
+    if (error) throw error
+  } else {
+    const { error } = await supabase.from("wh_bays").delete().eq("id", id)
+    if (error) throw error
+  }
+  const idx = bays.findIndex(b => b.id === id)
+  if (idx >= 0) bays.splice(idx, 1)
+}
+
 // ── Roles (wh_roles) ─────────────────────────────────────────────────────────
 // ป้ายชื่อ/emoji/รูปของตำแหน่งงานในหน้าเลือกตำแหน่งงาน — id ต้องคงที่เสมอเพราะ
 // ROLE_TABS/LANE_SELECT_ROLES ใน App.jsx ผูก logic ว่า role ไหนเห็นเมนูอะไรกับ id

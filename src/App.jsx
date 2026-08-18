@@ -31,6 +31,7 @@ import {
   detailSources, saveDetailSource, deleteDetailSource, defaultDetailCols,
   lanes, saveLane,
   roles, saveRole,
+  bays, addBay, saveBay, deleteBay,
 } from "./lib/masterData";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1787,20 +1788,53 @@ const Picking = ({ trucks, queue, onUpdate, detailMapByChannel = {} }) => {
   );
 };
 
+// ── 3.5 BAY SELECT (เลือกช่องโหลดก่อนเข้าฟอร์ม QC/QC สุ่ม/Checker ทุกครั้ง — ไม่จำค่าไว้) ──
+// เปิด/ปิดได้ทั้งระบบที่ settings.enableBaySelection (Master Setting → 🚪 ช่องโหลด)
+const BaySelect = ({ laneId, actLane, title, onSelect, onBack }) => {
+  const laneBays = bays.filter(b => b.laneId === laneId).sort((a, b) => a.sortOrder - b.sortOrder);
+  return (
+    <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
+      <div style={{ maxWidth: 420, width: "100%" }}>
+        <h2 style={{ textAlign: "center", fontWeight: 900, fontSize: 20, margin: "0 0 4px" }}>{title}</h2>
+        <p style={{ textAlign: "center", color: "#6b7280", fontSize: 12, margin: "0 0 28px" }}>เลือกช่องโหลด</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {laneBays.map(b => (
+            <button key={b.id} onClick={() => onSelect(b.id)}
+              style={{ background: "#fff", border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "16px 14px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "center", color: actLane.color }}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+        {onBack && (
+          <button onClick={onBack} style={{ marginTop: 24, width: "100%", background: "transparent", border: "none", color: "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "center" }}>
+            ← กลับหน้าเลือกลานโหลด
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── 4. QC (per-lane) ──────────────────────────────────────────────────────────
-const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
+const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, onBack }) => {
   const [selId,     setSelId]     = useState("");
   const lane = laneId;
   const [temp,      setTemp]      = useState("");
   const [photo,     setPhoto]     = useState(null);
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [bayId,     setBayId]     = useState(null);
 
   // รับทุกรถที่สถานะ "picking" (พิมพ์เบิกแล้ว)
   const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
   const sel      = trucks.find(t => t.id === selId) || null;
   const actLane  = lanes.find(l => l.id === lane);
   const thisLaneQCd = sel?.qcLanes?.[lane]?.done;
+  const bay      = settings.enableBaySelection ? bays.find(b => b.id === bayId) : null;
+
+  if (settings.enableBaySelection && !bayId) {
+    return <BaySelect laneId={lane} actLane={actLane} title={`ลานโหลด → ${actLane.label}`} onSelect={setBayId} onBack={onBack} />;
+  }
 
   const handlePhoto = e => {
     const files = Array.from(e.target.files).slice(0, settings.maxPhotoUploads); if (!files.length) return;
@@ -1817,7 +1851,7 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
     setUploading(true);
     try {
       const photoUrls = await uploadPhotos(`qc`, sel.plate, Array.isArray(photo) ? photo : (photo ? [photo] : []));
-      const qcLanes = { ...(sel.qcLanes || {}), [lane]: { done: true, temp, photos: photoUrls, doneAt: TIME_NOW() } };
+      const qcLanes = { ...(sel.qcLanes || {}), [lane]: { done: true, temp, photos: photoUrls, doneAt: TIME_NOW(), bayId: bay?.id || null } };
       await onUpdate(sel.id, { qcLanes });
       setFlashLane(lane); setTemp(""); setPhoto(null);
       setTimeout(() => setFlashLane(null), 2500);
@@ -1832,7 +1866,15 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>ลานโหลด → {actLane.label}</h2>
+      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span>ลานโหลด → {actLane.label}{bay ? ` · ${bay.label}` : ""}</span>
+        {bay && (
+          <button onClick={() => setBayId(null)}
+            style={{ background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+            เปลี่ยนช่องโหลด
+          </button>
+        )}
+      </h2>
 
       {flashLane && (
         <div style={{ padding: "13px 16px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
@@ -1907,19 +1949,25 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
 };
 
 // ── 4b. RANDOM SAMPLE CHECK (per-lane, photo only, no temp) ───────────────────
-const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }) => {
+const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, onBack }) => {
   const [selId,     setSelId]     = useState("");
   const lane = laneId;
   const [photo,     setPhoto]     = useState(null);
   const [note,      setNote]      = useState("");
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [bayId,     setBayId]     = useState(null);
 
   const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
   const sel      = trucks.find(t => t.id === selId) || null;
   const actLane  = lanes.find(l => l.id === lane);
   const photos   = Array.isArray(photo) ? photo : (photo ? [photo] : []);
   const thisLaneChecked = sel?.sampleLanes?.[lane]?.done;
+  const bay      = settings.enableBaySelection ? bays.find(b => b.id === bayId) : null;
+
+  if (settings.enableBaySelection && !bayId) {
+    return <BaySelect laneId={lane} actLane={actLane} title={`ตรวจอุณหภูมิ → ${actLane.label}`} onSelect={setBayId} onBack={onBack} />;
+  }
 
   const handlePhoto = e => {
     const files = Array.from(e.target.files).slice(0, settings.maxPhotoUploads); if (!files.length) return;
@@ -1936,7 +1984,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
     setUploading(true);
     try {
       const photoUrls = await uploadPhotos(`sample`, sel.plate, photos);
-      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW() } };
+      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW(), bayId: bay?.id || null } };
       await onUpdate(sel.id, { sampleLanes });
       setFlashLane(lane); setPhoto(null); setNote("");
       setTimeout(() => setFlashLane(null), 2500);
@@ -1949,7 +1997,15 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>ตรวจอุณหภูมิ → {actLane.label}</h2>
+      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span>ตรวจอุณหภูมิ → {actLane.label}{bay ? ` · ${bay.label}` : ""}</span>
+        {bay && (
+          <button onClick={() => setBayId(null)}
+            style={{ background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+            เปลี่ยนช่องโหลด
+          </button>
+        )}
+      </h2>
 
       {flashLane && (
         <div style={{ padding: "13px 16px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 14, display: "flex", gap: 8, alignItems: "center" }}>
@@ -2028,8 +2084,9 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {} }
 };
 
 // ── 5. LOADING YARD (per-lane gate) ───────────────────────────────────────────
-const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
+const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
   const [activeLane, setActiveLane] = useState(laneId ?? "lane_parts");
+  const [bayId, setBayId] = useState(null);
   const emptyBaskets = () => ({ ...Object.fromEntries(basketTypes.map(b => [b.key, ""])), payer: "" });
   const [forms, setForms] = useState({
     lane_parts: { selId: "", photo: null, note: "", flash: false, uploading: false, baskets: emptyBaskets() },
@@ -2048,6 +2105,11 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
   const setReasonAt = (idx, val) => setWaitingReasons(rs => rs.map((r, i) => i === idx ? val : r));
   const addReasonField = () => setWaitingReasons(rs => rs.length >= MAX_WAITING_REASONS ? rs : [...rs, ""]);
   const removeReasonField = (idx) => setWaitingReasons(rs => rs.length <= 1 ? rs : rs.filter((_, i) => i !== idx));
+  const bay = settings.enableBaySelection ? bays.find(b => b.id === bayId) : null;
+
+  if (settings.enableBaySelection && !bayId) {
+    return <BaySelect laneId={activeLane} actLane={curLane} title={`Checker ${curLane.label}`} onSelect={setBayId} onBack={onBack} />;
+  }
 
   // ตัวเลือก dropdown ของ popup "รอสินค้าอะไร" — ชื่อสินค้าจาก Master ลานโหลด กรองเฉพาะลานที่เปิดอยู่
   const waitingOptions = (() => {
@@ -2094,7 +2156,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
     setWaitingModal(false);
     setF(activeLane, { uploading: true });
     try {
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), waitingFor: combinedReason, note: form.note } };
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), waitingFor: combinedReason, note: form.note, bayId: bay?.id || null } };
       await onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", uploading: false, baskets: emptyBaskets() });
     } catch (e) {
@@ -2113,7 +2175,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
       const existing = sel.loadLanes?.[activeLane] || {};
       const baskets = Object.fromEntries(basketTypes.map(b => [b.key, Number(form.baskets?.[b.key]) || 0]));
       const basketPayer = (form.baskets?.payer || "").trim();
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer } };
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer, bayId: bay?.id || null } };
       await onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false, baskets: emptyBaskets() });
       setTimeout(() => setF(activeLane, { flash: false }), 2500);
@@ -2147,7 +2209,15 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [] }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>Checker {curLane.label}</h2>
+      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span>Checker {curLane.label}{bay ? ` · ${bay.label}` : ""}</span>
+        {bay && (
+          <button onClick={() => setBayId(null)}
+            style={{ background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+            เปลี่ยนช่องโหลด
+          </button>
+        )}
+      </h2>
 
       {/* ฟอร์มลาน */}
       <div style={{ background: curLane.bg, border: `2px solid ${curLane.border}`, borderRadius: 0, padding: 20, marginBottom: 16 }}>
@@ -2329,6 +2399,7 @@ const buildLaneEvents = (list, sources) => {
             laneLabel: lane.tinyLabel,
             laneColor: lane.color,
             laneBg: lane.bg,
+            bayLabel: ld.bayId ? (bays.find(b => b.id === ld.bayId)?.label || ld.bayId) : "",
             doneAt: ld.doneAt,
             photos: ld.photos || [],
             doneLabel: src.doneLabel,
@@ -2468,6 +2539,11 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
                   <span style={{ background: ev.laneBg, color: ev.laneColor, borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
                     {ev.laneLabel}
                   </span>
+                  {ev.bayLabel && (
+                    <span style={{ background: "#f3f4f6", color: "#374151", borderRadius: 0, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>
+                      {ev.bayLabel}
+                    </span>
+                  )}
                   <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>{ev.doneLabel}</span>
                 </div>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
@@ -3802,6 +3878,126 @@ const RoleSettings = () => {
   );
 };
 
+const Switch = ({ checked, onChange, disabled }) => (
+  <button
+    onClick={() => !disabled && onChange(!checked)}
+    disabled={disabled}
+    style={{
+      width: 44, height: 24, borderRadius: 999, border: "none", padding: 2, flexShrink: 0,
+      background: checked ? "#16a34a" : "#d1d5db", cursor: disabled ? "default" : "pointer",
+      display: "flex", alignItems: "center", justifyContent: checked ? "flex-end" : "flex-start",
+      transition: "background 0.15s",
+    }}>
+    <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" }} />
+  </button>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BAYS (wh_bays) — ช่องโหลดย่อยในแต่ละลาน + สวิตช์เปิด/ปิดการบังคับเลือกช่องโหลดทั้งระบบ
+// ─────────────────────────────────────────────────────────────────────────────
+const BaySettings = () => {
+  const [rows, setRows] = useState(() => [...bays]);
+  const [newLabel, setNewLabel] = useState(() => Object.fromEntries(lanes.map(l => [l.id, ""])));
+  const [busy, setBusy] = useState(null);
+  const [enabled, setEnabled] = useState(settings.enableBaySelection);
+  const [toggling, setToggling] = useState(false);
+
+  const refresh = () => setRows([...bays]);
+  const editLabel = (id) => (e) => setRows(rs => rs.map(r => r.id === id ? { ...r, label: e.target.value } : r));
+
+  const save = async (row) => {
+    setBusy(row.id);
+    try {
+      await saveBay(row.id, row.label);
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      refresh(); // ทั้งสำเร็จและพัง ก็ sync กลับไปตามค่าจริงใน `bays` เสมอ กันช่องค้างข้อความที่ไม่ได้บันทึกจริง
+      setBusy(null);
+    }
+  };
+
+  const add = async (laneId) => {
+    const label = (newLabel[laneId] || "").trim();
+    setBusy(`add_${laneId}`);
+    try {
+      await addBay(laneId, label);
+      setNewLabel(nl => ({ ...nl, [laneId]: "" }));
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm(`ลบ "${row.label}"?`)) return;
+    setBusy(row.id);
+    try {
+      await deleteBay(row.id);
+      refresh();
+    } catch (e) {
+      alert("ลบไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleEnabled = async (v) => {
+    setToggling(true);
+    try {
+      await saveSetting("enable_bay_selection", v);
+      setEnabled(v);
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const inp = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none" };
+
+  return (
+    <Collapsible title="🚪 ช่องโหลด">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0 16px", borderBottom: "1px solid #f3f4f6", marginBottom: 14 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#111" }}>เปิดใช้งานการเลือกช่องโหลด</div>
+          <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>ปิดแล้วหน้า ลานโหลด/QC/Checker จะข้ามหน้าเลือกช่องโหลดไปเข้าฟอร์มเลย ไม่บันทึกช่องโหลดลง DB</div>
+        </div>
+        <Switch checked={enabled} onChange={toggleEnabled} disabled={toggling} />
+      </div>
+      {lanes.map(lane => {
+        const laneBays = rows.filter(b => b.laneId === lane.id).sort((a, b) => a.sortOrder - b.sortOrder);
+        return (
+          <div key={lane.id} style={{ marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: lane.color, marginBottom: 8 }}>{lane.tinyLabel} ({laneBays.length} ช่องโหลด)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+              {laneBays.map(r => (
+                <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 4, border: "1.5px solid #e5e7eb", borderRadius: 0, padding: "6px 6px 6px 10px", background: "#fff" }}>
+                  <input value={r.label} onChange={editLabel(r.id)} onBlur={() => { if (r.label !== bays.find(b => b.id === r.id)?.label) save(r); }} disabled={busy === r.id}
+                    style={{ border: "none", outline: "none", fontSize: 13, fontWeight: 700, width: 140, background: "transparent" }} />
+                  <button onClick={() => remove(r)} disabled={busy === r.id}
+                    style={{ background: "none", border: "none", color: busy === r.id ? "#e5e7eb" : "#dc2626", cursor: busy === r.id ? "default" : "pointer", fontSize: 16, lineHeight: 1, padding: "2px 4px" }}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+              <input value={newLabel[lane.id] || ""} onChange={e => setNewLabel(nl => ({ ...nl, [lane.id]: e.target.value }))} style={inp} placeholder={`เช่น ช่องโหลด ${laneBays.length + 1}`} />
+              <button onClick={() => add(lane.id)} disabled={busy === `add_${lane.id}`}
+                style={{ background: busy === `add_${lane.id}` ? "#e5e7eb" : "#111", color: busy === `add_${lane.id}` ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 16px", fontWeight: 700, fontSize: 13, cursor: busy === `add_${lane.id}` ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                + เพิ่มช่อง
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </Collapsible>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4612,6 +4808,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
       <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
         <SystemSettings />
         <LaneSettings />
+        <BaySettings />
         <RoleSettings />
         <LaneAliasSettings />
         <WaitingReasonSettings />
@@ -4634,6 +4831,8 @@ const WT_GROUPS = [
 ];
 const WT_GROUP_MAP = Object.fromEntries(WT_GROUPS.map(g => [g.id, g]));
 const WT_CELL_BG  = { info: "#f8fafc", entry: "#eff6ff", parts: "#fff7ed", head: "#f5f3ff", pork: "#fff1f2", docs: "#f0fdfa", exit: "#f8fafc" };
+
+const GRP_LANE = { parts: "lane_parts", head: "lane_head", pork: "lane_pork" };
 
 // ─── STAT TILE (Tracking summary cards) ──────────────────────────────────────
 // de-emphasis bars in a light tint of the tile's own accent hue, current (last) bar in full accent
@@ -4754,14 +4953,26 @@ const EntryStatTile = ({ icon, accent, title, count, prevCount, onTimePct, onTim
   </div>
 );
 
-const WorkTracking = ({ trucks, queue }) => {
+const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] }) => {
   const today = cycleDateStr();
   const [date, setDate]       = useState(today);
   const [archiveData, setArchiveData] = useState(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
   const [prevArchiveData, setPrevArchiveData] = useState(null);
+  const [histDetailMapByChannel, setHistDetailMapByChannel] = useState(null); // for a past date being viewed
   const [sortCol, setSortCol] = useState("arrivedAt");
   const [sortDir, setSortDir] = useState(1);
+
+  // วันปัจจุบัน → ใช้ detailMap สด, วันย้อนหลัง → ดึงไฟล์ PO ของวันนั้นมาคำนวณใหม่
+  // (Master ลานโหลดไม่ได้เก็บย้อนหลัง จึงใช้ตัวปัจจุบันร่วมกับไฟล์ PO ของวันที่ดู)
+  const effectiveDetailMapByChannel = date === today ? detailMapByChannel : (histDetailMapByChannel || {});
+
+  // lane groups the truck's PO data says it does NOT need — cell renders as light gray (N/A)
+  const irrelevantGrps = t => {
+    const lanes = laneMatchForTruck(t, effectiveDetailMapByChannel);
+    if (!lanes.size) return new Set();
+    return new Set(Object.keys(GRP_LANE).filter(g => !lanes.has(GRP_LANE[g])));
+  };
 
   useEffect(() => {
     setArchiveData(null);
@@ -4782,6 +4993,18 @@ const WorkTracking = ({ trucks, queue }) => {
       .then(({ data }) => { if (!cancelled) setPrevArchiveData(data ?? null); });
     return () => { cancelled = true; };
   }, [date]);
+
+  useEffect(() => {
+    if (date === today) { setHistDetailMapByChannel(null); return; }
+    let cancelled = false;
+    fetchDetailSrc(date).then(remote => {
+      if (cancelled) return;
+      const rowsByChannel = {};
+      for (const src of detailSources) rowsByChannel[src.id] = remote?.[src.id]?.rows || [];
+      setHistDetailMapByChannel(buildDetailMapByChannel(masterLane, rowsByChannel));
+    });
+    return () => { cancelled = true; };
+  }, [date, today, masterLane]);
 
   const activeTrucks = archiveData?.trucks ?? (date === today ? trucks : []);
   const activeQueue  = archiveData?.queue  ?? (date === today ? queue  : []);
@@ -5102,6 +5325,11 @@ const WorkTracking = ({ trucks, queue }) => {
                               : <span style={{ color: "#e5e7eb" }}>—</span>}
                           </td>
                         );
+                      }
+
+                      // ลานที่ไม่เกี่ยวข้องกับทะเบียนนี้ (ตามข้อมูล PO ที่อัพโหลด) — เทาอ่อน
+                      if (GRP_LANE[col.grp] && irrelevantGrps(t).has(col.grp)) {
+                        return <td key={col.id} style={{ padding: "7px 10px", background: "#e5e7eb", borderRight: "1px solid #e5e7eb" }} />;
                       }
 
                       // Generic time cell
@@ -5647,15 +5875,15 @@ export default function App() {
         {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
         {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMapByChannel={detailMapByChannel} />}
-        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
-        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
-        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
-        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} />}
-        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} />}
-        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} />}
-        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />}
-        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />}
-        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />}
+        {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "qc_head"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "qc_pork"   && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "loading_parts" && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} onBack={() => setTab(null)} />}
+        {tab === "loading_head"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} onBack={() => setTab(null)} />}
+        {tab === "loading_pork"  && <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} onBack={() => setTab(null)} />}
+        {tab === "sample_parts"  && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "sample_head"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
+        {tab === "sample_pork"   && <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} onBack={() => setTab(null)} />}
         {tab === "overview_log"  && <OverviewLog trucks={trucks} />}
         {tab === "work_tracking" && <WorkTracking trucks={trucks} queue={queue} detailMapByChannel={detailMapByChannel} masterLane={masterLane} />}
         {tab === "planning"      && <Planning trucks={trucks} queue={queue} onUpdate={handleUpdate} />}
