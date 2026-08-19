@@ -1145,7 +1145,8 @@ const LGUpload = ({ queue, onSetQueue }) => {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 18px", fontWeight: 900, fontSize: 22 }}>🤝 LG → Upload ตารางคิวรถ</h2>
+      <h2 style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 22 }}>🤝 LG → Upload ตารางคิวรถ</h2>
+      <p style={{ margin: "0 0 18px", fontSize: 13, color: "#6b7280" }}>ไฟล์ Export จาก Axons Move — DPI04000 (รายงาน Scheduling)</p>
 
       {/* Upload zone */}
       <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: fileName ? "#f0fdf4" : "#fafafa", border: `2px dashed ${fileName ? "#6ee7b7" : "#d1d5db"}`, borderRadius: 0, padding: 30, textAlign: "center", cursor: "pointer", marginBottom: 14 }}>
