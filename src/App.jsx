@@ -3462,7 +3462,10 @@ const SystemSettings = () => {
         </div>
         <div>
           <label style={lbl}>ชื่อเว็บ (แสดงบนแท็บ browser)</label>
-          <input value={form.siteTitle} onChange={set("siteTitle")} style={inp} placeholder="เช่น KB Loading" />
+          <div style={{ display: "flex" }}>
+            <input value={form.siteTitle} onChange={set("siteTitle")} style={{ ...inp, borderRight: "none" }} placeholder="เช่น KK" />
+            <div style={{ ...inp, borderLeft: "none", background: "#e5e7eb", color: "#9ca3af", flexShrink: 0, width: "auto", display: "flex", alignItems: "center" }}>Loading</div>
+          </div>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
