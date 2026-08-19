@@ -4339,11 +4339,17 @@ const laneMatchForTruck = (truck, detailMapByChannel) => {
 const DETAIL_LS_VER = "v2"; // bump when encoding/format changes — forces re-upload
 
 const DetailLoading = ({ masterLane, onDetailChange }) => {
+  // cache แคชไว้ต่อ "วันทำงาน" (คัดตาม cycleDateStr, ตัดรอบ 10:00 น. เดียวกับที่อื่น) —
+  // ไม่งั้นถ้ายังไม่มีใครอัปโหลดไฟล์ PO ของวันใหม่ หน้านี้จะดึง localStorage ของเมื่อวานมาโชว์
+  // ปนกับของวันนี้แทนที่จะว่างรอไฟล์ใหม่
+  const markDetailCacheFresh = () => { try { localStorage.setItem("wh_detail_date", cycleDateStr()); } catch {} };
   const initSrc = () => {
     try {
-      if (localStorage.getItem("wh_detail_ver") !== DETAIL_LS_VER) {
+      const stale = localStorage.getItem("wh_detail_ver") !== DETAIL_LS_VER || localStorage.getItem("wh_detail_date") !== cycleDateStr();
+      if (stale) {
         ["wh_detail_src", "wh_detail_names"].forEach(k => localStorage.removeItem(k));
         localStorage.setItem("wh_detail_ver", DETAIL_LS_VER);
+        markDetailCacheFresh();
         return {};
       }
       return JSON.parse(localStorage.getItem("wh_detail_src") || "{}");
@@ -4367,6 +4373,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
           merged[srcId] = rows;
           if (fileName) names[srcId] = fileName;
         }
+        markDetailCacheFresh();
         setSrcData(prev => {
           const next = { ...prev, ...merged };
           localStorage.setItem("wh_detail_src", JSON.stringify(next));
@@ -4401,6 +4408,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
         const payload2 = fresh?.data || row.data || {};
         const rows = Array.isArray(payload2) ? payload2 : (payload2.rows || []);
         const fileName = payload2.file_name || "";
+        markDetailCacheFresh();
         setSrcData(prev => {
           const next = { ...prev, [srcId]: rows };
           localStorage.setItem("wh_detail_src", JSON.stringify(next));
@@ -4447,6 +4455,7 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
           groupFlag:    String(r[groupFlagCol] || "").trim(),
         })).filter(r => r.plate && r.productCode);
 
+        markDetailCacheFresh();
         setSrcData(prev => {
           const next = { ...prev, [srcId]: parsed };
           localStorage.setItem("wh_detail_src", JSON.stringify(next));
