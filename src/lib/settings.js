@@ -17,6 +17,7 @@ export const settings = {
   excludedCustomerGroups:  ["CPFTH"],
   enableBaySelection:      true,
   masterFileFallbackCols:  { productCode: 1, lane: 4 },
+  masterSettingPin:        "0000",
 }
 
 const SETTERS = {
@@ -32,6 +33,7 @@ const SETTERS = {
   excluded_customer_groups: v => { if (Array.isArray(v)) settings.excludedCustomerGroups = v.filter(x => typeof x === "string"); },
   enable_bay_selection:     v => { settings.enableBaySelection = !!v; },
   master_file_fallback_cols: v => { if (v && typeof v === "object") settings.masterFileFallbackCols = { ...settings.masterFileFallbackCols, ...v }; },
+  master_setting_pin:       v => { if (typeof v === "string" && /^\d{4}$/.test(v)) settings.masterSettingPin = v; },
 }
 
 export async function loadSettings() {

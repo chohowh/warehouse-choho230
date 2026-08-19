@@ -511,6 +511,9 @@ const parseExitDatetime = (dateStr, timeStr) => {
     let [day, month, year] = dateStr.split("/").map(Number);
     // handle M/D/YYYY format (US Excel) — month > 12 means day/month are swapped
     if (month > 12) { [day, month] = [month, day]; }
+    // defensively correct a stray Thai Buddhist-era year (e.g. old data saved before
+    // toDateStr converted it) — otherwise the exit countdown ends up ~543 years off
+    if (year > 2400) year -= 543;
     if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
       const d = new Date(year, month - 1, day, h, min, 0, 0);
       if (h * 60 + min <= settings.workDayCutoffHour * 60) d.setDate(d.getDate() + 1);
@@ -903,7 +906,13 @@ const Dashboard = ({ trucks, queue, onReset, lane, detailMap, title, myPlate, si
     ...dashQueueRows,
     ...walkIns.map(t => ({ key: t.id, date: t.date || "", plate: t.plate, customerGroup: t.customerGroup || "–", entryTime: t.entryTime || "", exitTime: t.exitTime || "", truck: t, assignedLanes: laneMatchForTruck(t, detailMap) })),
   ].filter(row => !settings.excludedCustomerGroups.includes(row.customerGroup))
-  .filter(row => !lane || !row.truck?.loadLanes?.[lane]?.done)
+  // on a lane-specific tab: hide trucks confirmed (matched against PO/master data) to use a
+  // *different* lane; keep unmatched trucks (assignedLanes empty — not known yet) visible on
+  // every lane tab until the match becomes clear, and keep hiding ones already done on this lane
+  .filter(row => !lane || (
+    (!row.assignedLanes?.size || row.assignedLanes.has(lane)) &&
+    !row.truck?.loadLanes?.[lane]?.done
+  ))
   .sort((a, b) => {
     const rank = row => {
       if (["invoiced", "summary_printed"].includes(row.truck?.status)) return 5;
@@ -967,9 +976,22 @@ const parseQueueDateToISO = (dateStr) => {
   return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 };
 
+// Axons Move exports the date as plain text — either a bare "16/08/2569" or a full
+// "16/08/2569 17:00:00" — using the Thai Buddhist-era year (2569 = 2026 CE). Every other
+// date in the app (SHORT_DATE/DATE_STR/manual entry) is Gregorian, so passing the BE year
+// straight through silently threw exit-time countdowns ~543 years into the future.
 const toDateStr = (val) => {
   if (val === "" || val == null) return "";
-  if (typeof val === "string" && /\d/.test(val)) return val.trim();
+  if (typeof val === "string" && /\d/.test(val)) {
+    const m = val.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) {
+      const [, d, mo, yRaw] = m;
+      let y = Number(yRaw);
+      if (y > 2400) y -= 543;
+      return `${Number(d)}/${Number(mo)}/${y}`;
+    }
+    return val.trim();
+  }
   const num = typeof val === "number" ? val : parseFloat(val);
   if (!isNaN(num) && num > 1000) {
     const d = new Date(Math.round((num - 25569) * 86400 * 1000));
@@ -2494,9 +2516,36 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
 
   const inp = { border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", width: isMobile ? "100%" : undefined };
 
+  const exportExcel = () => {
+    const rows = [];
+    for (const group of groupsByTruck) {
+      for (const ev of group.lanes) {
+        rows.push({
+          "ทะเบียน": group.plate,
+          "กลุ่มลูกค้า": group.customerGroup || "",
+          "Zone": group.zone || "",
+          "ประเภทงาน": ev.laneLabel,
+          "จุดจอด": ev.bayLabel || "",
+          "รายการ": ev.doneLabel,
+          "หมายเหตุ": ev.note || "",
+          "เวลา": formatLogTime(ev.doneAt, date),
+        });
+      }
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), date);
+    XLSX.writeFile(wb, `Log_ภาพรวม_${date}.xlsx`);
+  };
+
   return (
     <div style={{ maxWidth: 560, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
-      <h2 style={{ margin: "0 0 14px", fontWeight: 900, fontSize: isMobile ? 18 : 22 }}>{title}</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <h2 style={{ margin: 0, fontWeight: 900, fontSize: isMobile ? 18 : 22 }}>{title}</h2>
+        <button onClick={exportExcel} disabled={groupsByTruck.length === 0}
+          style={{ background: groupsByTruck.length === 0 ? "#e5e7eb" : "#16a34a", color: groupsByTruck.length === 0 ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: groupsByTruck.length === 0 ? "default" : "pointer", whiteSpace: "nowrap" }}>
+          Export Excel
+        </button>
+      </div>
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8, marginBottom: 8 }}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ ...inp, flex: isMobile ? undefined : 1, minWidth: isMobile ? undefined : 160 }}>
@@ -3849,26 +3898,30 @@ const RoleSettings = () => {
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
         แก้ป้ายชื่อ/emoji ของตำแหน่งงานได้ที่นี่ — รหัสตำแหน่ง (id) เปลี่ยนไม่ได้และเพิ่ม/ลบไม่ได้ เพราะผูกกับสิทธิ์เข้าถึงเมนูของแต่ละตำแหน่งในโค้ดโดยตรง
       </div>
-      {rows.map(r => (
-        <div key={r.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 8, alignItems: "end", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
-          <div>
-            <label style={lbl}>id</label>
-            <div style={{ fontSize: 12, color: "#9ca3af", padding: "9px 0" }}>{r.id}</div>
-          </div>
-          <div>
-            <label style={lbl}>ชื่อที่แสดง</label>
-            <input value={r.label} onChange={editField(r.id, "label")} style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Emoji</label>
-            <input value={r.emoji || ""} onChange={editField(r.id, "emoji")} style={inp} />
-          </div>
-          <button onClick={() => save(r)} disabled={busy === r.id}
-            style={{ background: busy === r.id ? "#e5e7eb" : "#111", color: busy === r.id ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: busy === r.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
-            💾 บันทึก
-          </button>
-        </div>
-      ))}
+      {/* single shared grid (not one grid per row) so the "id"/label/emoji columns line up across every row */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(70px,auto) 1fr 90px auto", columnGap: 10, rowGap: 6, alignItems: "center" }}>
+        <div style={lbl}>id</div>
+        <div style={lbl}>ชื่อที่แสดง</div>
+        <div style={lbl}>Emoji</div>
+        <div />
+        {rows.map(r => (
+          <React.Fragment key={r.id}>
+            <div style={{ fontSize: 12, color: "#9ca3af", borderTop: "1px solid #f3f4f6", padding: "10px 0" }}>{r.id}</div>
+            <div style={{ borderTop: "1px solid #f3f4f6", padding: "6px 0" }}>
+              <input value={r.label} onChange={editField(r.id, "label")} style={inp} />
+            </div>
+            <div style={{ borderTop: "1px solid #f3f4f6", padding: "6px 0" }}>
+              <input value={r.emoji || ""} onChange={editField(r.id, "emoji")} style={inp} />
+            </div>
+            <div style={{ borderTop: "1px solid #f3f4f6", padding: "6px 0" }}>
+              <button onClick={() => save(r)} disabled={busy === r.id}
+                style={{ background: busy === r.id ? "#e5e7eb" : "#111", color: busy === r.id ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: busy === r.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                💾 บันทึก
+              </button>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
     </Collapsible>
   );
 };
@@ -4615,9 +4668,55 @@ const DetailLoading = ({ masterLane, onDetailChange }) => {
   );
 };
 
-// ─── MASTER UPLOAD (แยกออกมาจาก Detail Loading ให้มีหน้าของตัวเอง) ──────────
-const MASTER_SETTING_PIN = "0000";
+// ─── PIN SETTINGS (รหัสผ่านเข้าแก้ Master Setting) ───────────────────────────
+const PinSettings = () => {
+  const [pin,        setPin]        = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [saving,     setSaving]     = useState(false);
+  const [msg,        setMsg]        = useState("");
 
+  const inp = { width: "100%", border: "1.5px solid #d1d5db", borderRadius: 0, padding: "9px 12px", fontSize: 14, fontWeight: 600, boxSizing: "border-box", outline: "none", textAlign: "center", letterSpacing: 4 };
+
+  const save = async () => {
+    if (!/^\d{4}$/.test(pin)) { setMsg(""); alert("รหัสผ่านต้องเป็นตัวเลข 4 หลัก"); return; }
+    if (pin !== confirmPin) { setMsg(""); alert("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
+    setSaving(true);
+    setMsg("");
+    try {
+      await saveSetting("master_setting_pin", pin);
+      setPin(""); setConfirmPin("");
+      setMsg("✅ เปลี่ยนรหัสผ่านสำเร็จ — มีผลทันทีในเซสชันนี้ เครื่องอื่นต้องรีเฟรชหน้าถึงจะเห็นค่าใหม่");
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Collapsible title="🔑 รหัสผ่านเข้าแก้ Master Setting">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={{ display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 }}>รหัสผ่านใหม่ (4 หลัก)</label>
+          <input type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={pin}
+            onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} style={inp} />
+        </div>
+        <div>
+          <label style={{ display: "block", fontWeight: 700, fontSize: 12, color: "#6b7280", marginBottom: 6 }}>ยืนยันรหัสผ่านใหม่</label>
+          <input type="password" inputMode="numeric" maxLength={4} placeholder="••••" value={confirmPin}
+            onChange={e => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))} style={inp} />
+        </div>
+      </div>
+      <button onClick={save} disabled={saving}
+        style={{ background: "#111", color: "#fff", border: "none", borderRadius: 0, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+        {saving ? "กำลังบันทึก..." : "บันทึกรหัสผ่าน"}
+      </button>
+      {msg && <div style={{ marginTop: 10, fontSize: 12, color: "#065f46" }}>{msg}</div>}
+    </Collapsible>
+  );
+};
+
+// ─── MASTER UPLOAD (แยกออกมาจาก Detail Loading ให้มีหน้าของตัวเอง) ──────────
 const MasterUpload = ({ masterLane, onMasterChange }) => {
   const [fileName, setFileName] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wh_detail_names") || "{}").master || ""; } catch { return ""; }
@@ -4629,7 +4728,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
   const [pinError,   setPinError]   = useState(false);
 
   const checkPin = () => {
-    if (pinInput === MASTER_SETTING_PIN) { setUnlocked(true); setPinError(false); }
+    if (pinInput === settings.masterSettingPin) { setUnlocked(true); setPinError(false); }
     else { setPinError(true); setPinInput(""); }
   };
 
@@ -4855,6 +4954,7 @@ const MasterUpload = ({ masterLane, onMasterChange }) => {
         <WaitingReasonSettings />
         <BasketTypeSettings />
         <DetailSourceSettings />
+        <PinSettings />
       </div>
     </div>
   );
