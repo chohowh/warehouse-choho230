@@ -199,9 +199,9 @@ export function defaultDetailCols() {
 //
 // 3 ตัวนี้เป็น default ในโค้ด เสมอ — ข้อมูลจาก wh_lanes เป็นส่วนเสริม/override เท่านั้น
 const DEFAULT_LANES = [
-  { id: "lane_parts", label: "ลานโหลดชิ้นส่วน",       shortLabel: "ลานโหลดชิ้นส่วน", tinyLabel: "ชิ้นส่วน",     emoji: "🥩", color: "#f97316", bg: "#fff7ed", border: "#fed7aa", sortOrder: 1 },
-  { id: "lane_head",  label: "ลานโหลดหัว/เครื่องใน",  shortLabel: "ลานโหลดหัว/เครื่องใน", tinyLabel: "หัว/เครื่องใน", emoji: "🐷", color: "#8b5cf6", bg: "#faf5ff", border: "#ddd6fe", sortOrder: 2 },
-  { id: "lane_pork",  label: "ลานโหลดหมูซีก",          shortLabel: "ลานโหลดหมูซีก",        tinyLabel: "หมูซีก",        emoji: "🐖", color: "#e11d48", bg: "#fff1f2", border: "#fecdd3", sortOrder: 3 },
+  { id: "lane_parts", label: "ลานโหลดชิ้นส่วน",       shortLabel: "ลานโหลดชิ้นส่วน", tinyLabel: "ชิ้นส่วน",     emoji: "🥩", color: "#f97316", bg: "#fff7ed", border: "#fed7aa", sortOrder: 1, enabled: true },
+  { id: "lane_head",  label: "ลานโหลดหัว/เครื่องใน",  shortLabel: "ลานโหลดหัว/เครื่องใน", tinyLabel: "หัว/เครื่องใน", emoji: "🐷", color: "#8b5cf6", bg: "#faf5ff", border: "#ddd6fe", sortOrder: 2, enabled: true },
+  { id: "lane_pork",  label: "ลานโหลดหมูซีก",          shortLabel: "ลานโหลดหมูซีก",        tinyLabel: "หมูซีก",        emoji: "🐖", color: "#e11d48", bg: "#fff1f2", border: "#fecdd3", sortOrder: 3, enabled: true },
 ]
 export const lanes = [...DEFAULT_LANES]
 
@@ -223,6 +223,7 @@ export async function loadLanes() {
         bg:         d.bg         || base.bg          || "#f3f4f6",
         border:     d.border     || base.border      || "#e5e7eb",
         sortOrder:  Number.isFinite(d.sortOrder) ? d.sortOrder : (base.sortOrder ?? 0),
+        enabled:    typeof d.enabled === "boolean" ? d.enabled : (base.enabled ?? true),
       }
       const idx = merged.findIndex(l => l.id === entry.id)
       if (idx >= 0) merged[idx] = entry; else merged.push(entry)

@@ -3830,7 +3830,19 @@ const LaneSettings = () => {
   const save = async (row) => {
     setBusy(row.id);
     try {
-      await saveLane(row.id, { label: row.label, shortLabel: row.shortLabel, tinyLabel: row.tinyLabel, emoji: row.emoji, color: row.color, bg: row.bg, border: row.border, sortOrder: row.sortOrder });
+      await saveLane(row.id, { label: row.label, shortLabel: row.shortLabel, tinyLabel: row.tinyLabel, emoji: row.emoji, color: row.color, bg: row.bg, border: row.border, sortOrder: row.sortOrder, enabled: row.enabled });
+      refresh();
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleEnabled = async (row, v) => {
+    setBusy(row.id);
+    try {
+      await saveLane(row.id, { label: row.label, shortLabel: row.shortLabel, tinyLabel: row.tinyLabel, emoji: row.emoji, color: row.color, bg: row.bg, border: row.border, sortOrder: row.sortOrder, enabled: v });
       refresh();
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
@@ -3845,10 +3857,10 @@ const LaneSettings = () => {
   return (
     <Collapsible title="🏭 ลานโหลด (Lanes)">
       <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
-        แก้ป้ายชื่อ/สี/emoji ของ 3 ลานได้ที่นี่ — รหัสลาน (id) เปลี่ยนไม่ได้เพราะผูกกับ QR/URL ที่พิมพ์ใช้งานอยู่แล้ว การเพิ่ม/ลดจำนวนลานต้องแก้โค้ดส่วน routing เพิ่มเติม
+        แก้ป้ายชื่อ/สี/emoji ของ 3 ลานได้ที่นี่ — รหัสลาน (id) เปลี่ยนไม่ได้เพราะผูกกับ QR/URL ที่พิมพ์ใช้งานอยู่แล้ว การเพิ่ม/ลดจำนวนลานต้องแก้โค้ดส่วน routing เพิ่มเติม ปิดใช้งานลานจะซ่อนลานนั้นจากเมนูเลือกลานของ QC/ลานโหลด/Checker (URL/QR เดิมยังเปิดเข้ามาได้แต่จะเจอข้อความแจ้งว่าลานปิดใช้งานอยู่)
       </div>
       {rows.map(r => (
-        <div key={r.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr 56px auto", gap: 8, alignItems: "end", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+        <div key={r.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr 56px auto auto", gap: 8, alignItems: "end", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
           <div>
             <label style={lbl}>id</label>
             <div style={{ fontSize: 12, color: "#9ca3af", padding: "9px 0" }}>{r.id}</div>
@@ -3868,6 +3880,12 @@ const LaneSettings = () => {
           <div>
             <label style={lbl}>สี</label>
             <input type="color" value={r.color} onChange={editField(r.id, "color")} style={{ ...inp, padding: 2, height: 38 }} />
+          </div>
+          <div>
+            <label style={lbl}>ใช้งาน</label>
+            <div style={{ padding: "9px 0" }}>
+              <Switch checked={r.enabled !== false} onChange={(v) => toggleEnabled(r, v)} disabled={busy === r.id} />
+            </div>
           </div>
           <button onClick={() => save(r)} disabled={busy === r.id}
             style={{ background: busy === r.id ? "#e5e7eb" : "#111", color: busy === r.id ? "#9ca3af" : "#fff", border: "none", borderRadius: 0, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: busy === r.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
@@ -5527,6 +5545,15 @@ const ROLE_TABS = {
   all:          null,
 };
 
+// QC/ลานโหลด/Checker tabs each work a single lane — used to hide a tab's menu card
+// (LaneSelect) and to block its kiosk URL (?mode=...) when that lane is ปิดใช้งาน
+// (wh_lanes.enabled === false) ใน Master Setting > ลานโหลด (Lanes)
+const LANE_ENTRY_TAB_TO_LANE_ID = {
+  qc_parts: "lane_parts", qc_head: "lane_head", qc_pork: "lane_pork",
+  loading_parts: "lane_parts", loading_head: "lane_head", loading_pork: "lane_pork",
+  sample_parts: "lane_parts", sample_head: "lane_head", sample_pork: "lane_pork",
+};
+
 const RoleSelect = ({ onSelect }) => {
   const squareOptions = roles.slice(0, 6);
   const wideOptions   = roles.slice(6);
@@ -5838,8 +5865,27 @@ export default function App() {
     || isLoadingPartsMode || isLoadingHeadMode || isLoadingPorkMode
     || isSamplePartsMode || isSampleHeadMode || isSamplePorkMode
     || isDashboardTransportMode;
+  const isLaneEnabled = (tabId) => {
+    const laneId = LANE_ENTRY_TAB_TO_LANE_ID[tabId];
+    return !laneId || lanes.find(l => l.id === laneId)?.enabled !== false;
+  };
   const allowedTabIds = ROLE_TABS[role] || null;
-  const visibleTabs = allowedTabIds ? tabs.filter(t => allowedTabIds.includes(t.id)) : tabs;
+  const visibleTabs = (allowedTabIds ? tabs.filter(t => allowedTabIds.includes(t.id)) : tabs).filter(t => isLaneEnabled(t.id));
+
+  // ── Kiosk URL (?mode=qc_parts เป็นต้น) ของลานที่ถูกปิดใช้งานไว้ — QR/URL เดิมยังเปิด
+  // เข้ามาได้ แต่แจ้งเตือนแทนที่จะเปิดฟอร์มกรอกข้อมูลของลานนั้น
+  if (LANE_ENTRY_TAB_TO_LANE_ID[_urlMode] && !isLaneEnabled(_urlMode)) {
+    const modeLabel = tabs.find(t => t.id === _urlMode)?.label || _urlMode;
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div style={{ textAlign: "center", maxWidth: 360 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🚫</div>
+          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>ลานนี้ปิดใช้งานอยู่</div>
+          <div style={{ color: "#6b7280", fontSize: 14 }}>{modeLabel} ถูกปิดใช้งานชั่วคราวจาก Master Setting กรุณาติดต่อผู้ดูแลระบบ</div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Role select (เลือกตำแหน่งงานก่อนเข้าระบบ) ──
   if (!isKioskMode && !role) {
