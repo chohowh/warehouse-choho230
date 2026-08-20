@@ -226,11 +226,24 @@ const saveQrImage = async (url, mode) => {
   }
 };
 
+// prefix ป้ายชื่อของ QR การ์ดที่ผูกกับลานโหลด (ตามด้วยชื่อสั้นของลานจาก wh_lanes สด ๆ) —
+// แยกจาก QR_ITEMS.label เดิมเพื่อให้แก้ชื่อ/ชื่อสั้นของลานใน Master Setting แล้วสะท้อนที่นี่ทันที
+const QR_LANE_LABEL_PREFIX = {
+  qc_parts: "ลานโหลด", qc_head: "ลานโหลด", qc_pork: "ลานโหลด",
+  loading_parts: "Checker", loading_head: "Checker", loading_pork: "Checker",
+  sample_parts: "QC", sample_head: "QC", sample_pork: "QC",
+};
+
 const QRCodePage = () => {
   const base = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
   const [zoomItem, setZoomItem] = useState(null);
-  const topRowItems = QR_ITEMS.filter(i => i.mode === "driver" || i.mode === "dashboard_transport");
-  const restItems    = QR_ITEMS.filter(i => i.mode !== "driver" && i.mode !== "dashboard_transport");
+  const items = QR_ITEMS.map(i => {
+    const laneId = LANE_ENTRY_TAB_TO_LANE_ID[i.mode];
+    const lane = laneId && lanes.find(l => l.id === laneId);
+    return lane ? { ...i, label: `${QR_LANE_LABEL_PREFIX[i.mode]} ${lane.tinyLabel}` } : i;
+  });
+  const topRowItems = items.filter(i => i.mode === "driver" || i.mode === "dashboard_transport");
+  const restItems    = items.filter(i => i.mode !== "driver" && i.mode !== "dashboard_transport");
 
   const renderCard = ({ mode, emoji, label, color, bg }) => {
     const url = `${base}?mode=${mode}`;
@@ -5826,21 +5839,22 @@ export default function App() {
     planning:      trucks.filter(t => t.status === "summary_printed").length,
   };
 
+  const laneById = (id) => lanes.find(l => l.id === id) || {};
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: "chart"     },
     { id: "dashboard_transport", label: "Dashboard ขนส่ง", icon: "chart" },
     { id: "lg",        label: "LG",      icon: "upload"    },
     { id: "driver",    label: "คนขับ",   icon: "scan"      },
     { id: "picking",   label: "Picking", icon: "clipboard" },
-    { id: "qc_parts",      label: "ลานโหลด ชิ้นส่วน",      icon: "temp"      },
-    { id: "qc_head",       label: "ลานโหลด หัว/เครื่องใน", icon: "temp"      },
-    { id: "qc_pork",       label: "ลานโหลด หมูซีก",       icon: "temp"      },
-    { id: "loading_parts", label: "Checker ลานโหลดชิ้นส่วน", icon: "pig_cuts"  },
-    { id: "loading_head",  label: "Checker ลานโหลดหัว/เครื่องใน",  icon: "pig_head"  },
-    { id: "loading_pork",  label: "Checker ลานโหลดหมูซีก",  icon: "pig_side"  },
-    { id: "sample_parts",  label: "QC ชิ้นส่วน",          icon: "camera"    },
-    { id: "sample_head",   label: "QC หัว/เครื่องใน",     icon: "camera"    },
-    { id: "sample_pork",   label: "QC หมูซีก",           icon: "camera"    },
+    { id: "qc_parts",      label: `ลานโหลด ${laneById("lane_parts").tinyLabel}`,      icon: "temp"      },
+    { id: "qc_head",       label: `ลานโหลด ${laneById("lane_head").tinyLabel}`, icon: "temp"      },
+    { id: "qc_pork",       label: `ลานโหลด ${laneById("lane_pork").tinyLabel}`,       icon: "temp"      },
+    { id: "loading_parts", label: `Checker ${laneById("lane_parts").label}`, icon: "pig_cuts"  },
+    { id: "loading_head",  label: `Checker ${laneById("lane_head").label}`,  icon: "pig_head"  },
+    { id: "loading_pork",  label: `Checker ${laneById("lane_pork").label}`,  icon: "pig_side"  },
+    { id: "sample_parts",  label: `QC ${laneById("lane_parts").tinyLabel}`,          icon: "camera"    },
+    { id: "sample_head",   label: `QC ${laneById("lane_head").tinyLabel}`,     icon: "camera"    },
+    { id: "sample_pork",   label: `QC ${laneById("lane_pork").tinyLabel}`,           icon: "camera"    },
     { id: "basket_summary", label: "ข้อมูลยอดตะกร้า/ตะขอ", icon: "clipboard" },
     { id: "waiting_summary", label: "ข้อมูลการรอสินค้า", icon: "clock" },
     { id: "overview_log",   label: "Log ภาพรวมการทำงาน",  icon: "list"  },
@@ -5926,7 +5940,7 @@ export default function App() {
   if (isQcPartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="ลานโหลด ชิ้นส่วน" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title={tabs.find(t => t.id === "qc_parts").label} color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />
         </div>
@@ -5937,7 +5951,7 @@ export default function App() {
   if (isQcHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="ลานโหลด หัว/เครื่องใน" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title={tabs.find(t => t.id === "qc_head").label} color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />
         </div>
@@ -5948,7 +5962,7 @@ export default function App() {
   if (isQcPorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🌡️" title="ลานโหลด หมูซีก" color="#0369a1" />
+        <KioskHeader emoji="🌡️" title={tabs.find(t => t.id === "qc_pork").label} color="#0369a1" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />
         </div>
@@ -5960,7 +5974,7 @@ export default function App() {
   if (isLoadingPartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🥩" title="Checker ลานโหลดชิ้นส่วน" color="#c2410c" />
+        <KioskHeader emoji="🥩" title={tabs.find(t => t.id === "loading_parts").label} color="#c2410c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" masterLane={masterLane} />
         </div>
@@ -5971,7 +5985,7 @@ export default function App() {
   if (isLoadingHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🐷" title="Checker ลานโหลดหัว/เครื่องใน" color="#7c3aed" />
+        <KioskHeader emoji="🐷" title={tabs.find(t => t.id === "loading_head").label} color="#7c3aed" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" masterLane={masterLane} />
         </div>
@@ -5982,7 +5996,7 @@ export default function App() {
   if (isLoadingPorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="🐖" title="Checker ลานโหลดหมูซีก" color="#be123c" />
+        <KioskHeader emoji="🐖" title={tabs.find(t => t.id === "loading_pork").label} color="#be123c" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <LoadingYard trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" masterLane={masterLane} />
         </div>
@@ -5994,7 +6008,7 @@ export default function App() {
   if (isSamplePartsMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="QC ชิ้นส่วน" color="#0d9488" />
+        <KioskHeader emoji="📷" title={tabs.find(t => t.id === "sample_parts").label} color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} />
         </div>
@@ -6005,7 +6019,7 @@ export default function App() {
   if (isSampleHeadMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="QC หัว/เครื่องใน" color="#0d9488" />
+        <KioskHeader emoji="📷" title={tabs.find(t => t.id === "sample_head").label} color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_head" detailMapByChannel={detailMapByChannel} />
         </div>
@@ -6016,7 +6030,7 @@ export default function App() {
   if (isSamplePorkMode) {
     return (
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Sarabun','Noto Sans Thai',sans-serif" }}>
-        <KioskHeader emoji="📷" title="QC หมูซีก" color="#0d9488" />
+        <KioskHeader emoji="📷" title={tabs.find(t => t.id === "sample_pork").label} color="#0d9488" />
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 14px 60px" }}>
           <RandomSampleCheck trucks={trucks} onUpdate={handleUpdate} laneId="lane_pork" detailMapByChannel={detailMapByChannel} />
         </div>
