@@ -11,7 +11,7 @@ export const settings = {
   maxWaitingReasons:    3,
   geofence:             { lat: 14.7260, lng: 100.7950, radiusM: 2000 },
   facilityName:            "โรงงานพระพุทธบาท",
-  siteTitle:               "KB",
+  siteTitle:               "YST228",
   unitPrice:               120,
   vatRate:                 0.07,
   exitTimeWindowMinutes:   240,
