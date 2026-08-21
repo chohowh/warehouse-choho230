@@ -255,11 +255,11 @@ const printHomeQrTemplate = (url) => {
   .urlbox { flex-shrink: 0; width: 100%; max-width: 480px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 5px 17px; font-size: 16px; color: #4a154b; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
   .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
   .howto-title::before, .howto-title::after { content: ""; height: 3px; width: 32px; background: #f0c94a; border-radius: 2px; }
-  .steps { flex-shrink: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 14px; }
-  .step { display: flex; align-items: center; gap: 20px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 12px; padding: 18px 30px; text-align: left; }
+  .steps { flex-shrink: 0; width: 100%; max-width: 580px; display: flex; flex-direction: column; gap: 14px; }
+  .step { display: flex; align-items: center; gap: 20px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 12px; padding: 14px 30px; text-align: left; }
   .num { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
   .steptext { font-weight: 700; font-size: 23px; color: #3d1140; }
-  .footer { flex-shrink: 0; background: #f3d9ea; padding: 18px 10px 22px; text-align: center; position: relative; }
+  .footer { flex-shrink: 0; background: #f3d9ea; padding: 8px 10px 12px; text-align: center; position: relative; }
   .footer::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .footer .fname { font-weight: 900; font-size: 23px; color: #3d1140; }
   .footer .sub { font-size: 14px; color: #8a5a86; margin-top: 4px; font-weight: 600; }
