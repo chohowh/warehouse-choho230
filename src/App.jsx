@@ -384,11 +384,11 @@ const printDashboardQrTemplate = (url) => {
   body { display: flex; background: #eaf2fb; }
   .card { flex: 1; display: flex; flex-direction: column; border: 16px solid #bcd9f0; box-sizing: border-box; position: relative; overflow: hidden; min-height: 0; }
   .header { flex-shrink: 0; background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%); padding: 30px 20px; text-align: center; }
-  .header h1 { color: #fff; font-size: 44px; font-weight: 900; letter-spacing: 0.5px; }
+  .header h1 { color: #fff; font-size: 50px; font-weight: 900; letter-spacing: 0.5px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
-  .qrframe { flex-shrink: 0; background: #fff; border: 3px solid #1e3a8a; border-radius: 26px; padding: 42px; box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18); }
-  .qr { width: 660px; height: 660px; display: block; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 3px solid #1e3a8a; border-radius: 26px; padding: 36px; box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18); }
+  .qr { width: 540px; height: 540px; display: block; }
   .urlbox { flex-shrink: 0; width: 100%; max-width: 740px; background: #f3f4f6; border: 1.5px dashed #9fb8d6; border-radius: 10px; padding: 6px 17px; font-size: 18px; color: #1e3a8a; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
   .footer { flex-shrink: 0; background: #bcd9f0; padding: 18px 10px 22px; text-align: center; }
   .footer .fname { font-weight: 900; font-size: 26px; color: #1e293b; }
