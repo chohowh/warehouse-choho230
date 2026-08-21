@@ -21,6 +21,7 @@
 }
 
 @media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body { background: #fff !important; }
   /* Hide nav/header when printing QR page */
   header, nav, select, button, input { display: none !important; }
