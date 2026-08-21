@@ -314,25 +314,25 @@ const printDriverQrTemplate = (url) => {
   .header { flex-shrink: 0; background: linear-gradient(135deg, #16803d 0%, #0f5c2c 100%); padding: 26px 36px; display: flex; align-items: center; gap: 16px; }
   .accent { flex-shrink: 0; width: 6px; height: 46px; border-radius: 4px; background: #f0c94a; }
   .header .icon { font-size: 38px; line-height: 1; }
-  .header h1 { color: #fff; font-size: 34px; font-weight: 900; letter-spacing: 0.5px; }
+  .header h1 { color: #fff; font-size: 40px; font-weight: 900; letter-spacing: 0.5px; }
   .header h1 u { text-decoration: none; border-bottom: 4px solid #f0c94a; padding-bottom: 2px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
-  .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 55px; gap: 12px; }
-  .infobox { flex-shrink: 0; width: 100%; max-width: 628px; background: #eef2f6; border: 1.5px solid #dbe3ea; border-radius: 10px; padding: 10px 18px; text-align: center; }
-  .infobox .line1 { font-weight: 900; font-size: 19px; color: #1f2937; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 55px; gap: 10px; }
+  .infobox { flex-shrink: 0; width: 100%; max-width: 628px; background: #eef2f6; border: 1.5px solid #dbe3ea; border-radius: 10px; padding: 7px 18px; text-align: center; }
+  .infobox .line1 { font-weight: 900; font-size: 20px; color: #1f2937; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .infobox .line2 { font-size: 14px; color: #4b5563; margin-top: 2px; font-weight: 600; }
-  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 22px; padding: 26px; box-shadow: 0 8px 24px rgba(15, 92, 44, 0.18); }
-  .qr { width: 460px; height: 460px; display: block; }
-  .urlbox { flex-shrink: 0; width: 100%; max-width: 512px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 5px 17px; font-size: 15px; color: #0f5c2c; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
-  .howto-title { flex-shrink: 0; font-weight: 900; font-size: 22px; color: #0f5c2c; }
-  .steps { flex-shrink: 0; width: 100%; max-width: 620px; display: flex; flex-direction: row; align-items: stretch; gap: 14px; }
-  .step { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 10px; background: #eafbee; border: 1.5px solid #cdeecf; border-radius: 14px; padding: 12px 10px; }
-  .num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-  .steptext { font-weight: 900; font-size: 19px; line-height: 1.2; color: #0f5c2c; text-align: center; }
-  .footer { flex-shrink: 0; background: #cdeecf; padding: 8px 10px 12px; text-align: center; position: relative; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 22px; padding: 32px; box-shadow: 0 8px 24px rgba(15, 92, 44, 0.18); }
+  .qr { width: 560px; height: 560px; display: block; }
+  .urlbox { flex-shrink: 0; width: 100%; max-width: 628px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 5px 17px; font-size: 16px; color: #0f5c2c; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
+  .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #0f5c2c; }
+  .steps { flex-shrink: 0; width: 100%; max-width: 680px; display: flex; flex-direction: row; align-items: stretch; gap: 16px; }
+  .step { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 12px; background: #eafbee; border: 1.5px solid #cdeecf; border-radius: 14px; padding: 12px 10px; }
+  .num { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+  .steptext { font-weight: 900; font-size: 23px; line-height: 1.2; color: #0f5c2c; text-align: center; }
+  .footer { flex-shrink: 0; background: #cdeecf; padding: 6px 10px 10px; text-align: center; position: relative; }
   .footer::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
-  .footer .fname { font-weight: 900; font-size: 22px; color: #0f5c2c; }
-  .footer .sub { font-size: 13px; color: #3f7a52; margin-top: 4px; font-weight: 600; }
+  .footer .fname { font-weight: 900; font-size: 23px; color: #0f5c2c; }
+  .footer .sub { font-size: 14px; color: #3f7a52; margin-top: 4px; font-weight: 600; }
 </style></head>
 <body>
   <div class="card">
