@@ -239,7 +239,7 @@ const QR_LANE_LABEL_PREFIX = {
 // ─── คู่มือการใช้งาน (User Manual) ────────────────────────────────────────────
 const MANUAL_SECTIONS = [
   {
-    id: "driver", emoji: "🚛", title: "คนขับ – เช็คอินเข้าโรงงาน",
+    id: "driver", img: "/manual/driver.png", emoji: "🚛", title: "คนขับ – เช็คอินเข้าโรงงาน",
     audience: "คนขับรถบรรทุกที่มาส่ง/รับสินค้า (สแกน QR ที่ป้อมยาม)",
     steps: [
       "เปิดลิงก์/สแกน QR \"คนขับ เช็คอิน\" ระบบจะขอเปิด GPS ก่อนเข้าใช้งาน",
@@ -256,7 +256,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "qc_lane", emoji: "🌡️", title: "ลานโหลด – ตรวจอุณหภูมิรถก่อนเข้าโหลด (3 ลาน)",
+    id: "qc_lane", img: "/manual/qc_lane.png", emoji: "🌡️", title: "ลานโหลด – ตรวจอุณหภูมิรถก่อนเข้าโหลด (3 ลาน)",
     audience: "พนักงานประจำหน้าลานโหลดแต่ละลาน (บทบาท \"ลานโหลด\")",
     steps: [
       "เลือกช่องโหลด (ถ้าระบบเปิดใช้งานเลือกช่องโหลดไว้) ทุกครั้งที่เข้าฟอร์ม",
@@ -272,7 +272,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "qc_sample", emoji: "📷", title: "QC – สุ่มตรวจสินค้าด้วยรูปภาพ (3 ลาน)",
+    id: "qc_sample", img: "/manual/qc_sample.png", emoji: "📷", title: "QC – สุ่มตรวจสินค้าด้วยรูปภาพ (3 ลาน)",
     audience: "พนักงานตรวจคุณภาพสินค้า (บทบาท \"QC\")",
     steps: [
       "เลือกช่องโหลด (ถ้าเปิดใช้งาน) แล้วเลือกทะเบียนรถ",
@@ -286,7 +286,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "checker", emoji: "🧺", title: "Checker – โหลดสินค้าจริง + นับตะกร้า + แจ้งรอสินค้า (3 ลาน)",
+    id: "checker", img: "/manual/checker.png", emoji: "🧺", title: "Checker – โหลดสินค้าจริง + นับตะกร้า + แจ้งรอสินค้า (3 ลาน)",
     audience: "พนักงานหน้าลานที่ทำการโหลดสินค้าขึ้นรถจริง (บทบาท \"Checker\")",
     steps: [
       "เลือกช่องโหลด (ถ้าเปิดใช้งาน)",
@@ -300,7 +300,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "office_wh", emoji: "📋", title: "Office คลัง – พิมพ์ใบเบิก/ใบสรุปจ่าย (Picking)",
+    id: "office_wh", img: "/manual/office_wh.png", emoji: "📋", title: "Office คลัง – พิมพ์ใบเบิก/ใบสรุปจ่าย (Picking)",
     audience: "เจ้าหน้าที่คลัง",
     steps: [
       "เปิดหน้า Picking จะเห็นรายการรถวันนี้ เรียงรถที่ต้องทำก่อนไว้บนสุด",
@@ -311,7 +311,7 @@ const MANUAL_SECTIONS = [
     notes: ["ปุ่มแต่ละปุ่มกดได้เฉพาะตอนที่เงื่อนไขก่อนหน้าสำเร็จแล้วเท่านั้น (จะแสดงเป็น \"—\" ถ้ายังกดไม่ได้)"],
   },
   {
-    id: "office_plan", emoji: "📄", title: "Office วางแผน – ออก Invoice และอัพโหลด PO",
+    id: "office_plan", img: "/manual/office_plan.png", emoji: "📄", title: "Office วางแผน – ออก Invoice และอัพโหลด PO",
     audience: "เจ้าหน้าที่วางแผน/ออกเอกสาร",
     steps: [
       "หน้า \"ห้องวางแผน\": รถที่พิมพ์ใบสรุปแล้ว (สถานะ \"โหลดเสร็จ/สรุปแล้ว\") จะลอยขึ้นมาบนสุด",
@@ -325,7 +325,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "lg", emoji: "🚚", title: "LG – อัพโหลดคิวรถประจำวัน",
+    id: "lg", img: "/manual/lg.png", emoji: "🚚", title: "LG – อัพโหลดคิวรถประจำวัน",
     audience: "ฝ่าย LG/โลจิสติกส์",
     steps: [
       "อัพโหลดไฟล์ Excel/CSV ที่ Export จากระบบ Axons Move (รายงาน Scheduling)",
@@ -339,7 +339,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "dashboards", emoji: "📊", title: "Dashboard – ภาพรวมคิวรถวันนี้",
+    id: "dashboards", img: "/manual/dashboards.png", emoji: "📊", title: "Dashboard – ภาพรวมคิวรถวันนี้",
     audience: "ฝ่ายบริหาร/ห้องคุม/จอมอนิเตอร์ และบริษัทขนส่ง (Dashboard ขนส่ง)",
     steps: [
       "Dashboard หลัก แสดงตารางรถทุกคันวันนี้ พร้อมสถานะแต่ละลาน เวลาเข้า-ออก และเอกสารที่พิมพ์แล้ว",
@@ -353,7 +353,7 @@ const MANUAL_SECTIONS = [
     ],
   },
   {
-    id: "overview_log", emoji: "🗒️", title: "Log ภาพรวมการทำงาน",
+    id: "overview_log", img: "/manual/overview_log.png", emoji: "🗒️", title: "Log ภาพรวมการทำงาน",
     audience: "ผู้ดูแล/ฝ่ายข้อมูลการโหลดสินค้า",
     steps: [
       "เลือกวันที่ และกรองตามประเภทเหตุการณ์ (โหลดจ่ายสินค้า / ตรวจอุณหภูมิรถ / ตรวจอุณหภูมิสินค้า) หรือค้นหาทะเบียน/คำค้น",
@@ -363,7 +363,7 @@ const MANUAL_SECTIONS = [
     notes: [],
   },
   {
-    id: "work_tracking", emoji: "📈", title: "Tracking การทำงาน",
+    id: "work_tracking", img: "/manual/work_tracking.png", emoji: "📈", title: "Tracking การทำงาน",
     audience: "ผู้บริหาร/ฝ่ายติดตาม KPI",
     steps: [
       "เลือกวันที่ที่ต้องการดู (ดูข้อมูลวันก่อนหน้าจากประวัติที่บันทึกไว้ได้)",
@@ -374,7 +374,7 @@ const MANUAL_SECTIONS = [
     notes: ["ช่องที่ไม่เกี่ยวกับรถคันนั้น (เช่น รถที่ไม่ได้โหลดลานหมูซีก) จะแสดงเป็นสีเทาอัตโนมัติ"],
   },
   {
-    id: "basket_summary", emoji: "🧺", title: "ข้อมูลยอดตะกร้า/ตะขอ",
+    id: "basket_summary", img: "/manual/basket_summary.png", emoji: "🧺", title: "ข้อมูลยอดตะกร้า/ตะขอ",
     audience: "ผู้ดูแลระบบ (บทบาท \"ทั้งหมด\")",
     steps: [
       "เลือกวันที่/ทะเบียนที่ต้องการดู",
@@ -385,7 +385,7 @@ const MANUAL_SECTIONS = [
     notes: ["ยอดค้างคืนคำนวณสะสมข้ามวัน ไม่ถูกล้างเมื่อกด \"ล้างวันใหม่\""],
   },
   {
-    id: "waiting_summary", emoji: "⏳", title: "ข้อมูลการรอสินค้า",
+    id: "waiting_summary", img: "/manual/waiting_summary.png", emoji: "⏳", title: "ข้อมูลการรอสินค้า",
     audience: "ผู้ดูแลระบบ (บทบาท \"ทั้งหมด\")",
     steps: [
       "เลือกวันที่/ทะเบียน เพื่อดูรายการรถที่ Checker แจ้ง \"รอเติมสินค้า\"",
@@ -395,7 +395,7 @@ const MANUAL_SECTIONS = [
     notes: ["ถ้าทะเบียนเดียวกันรอสินค้าซ้ำหลายครั้งในลานเดียวกันวันเดียวกัน ระบบจะเก็บ/แสดงเฉพาะครั้งล่าสุดเท่านั้น"],
   },
   {
-    id: "end_of_day", emoji: "🗑️", title: "จบการทำงาน",
+    id: "end_of_day", img: "/manual/end_of_day.png", emoji: "🗑️", title: "จบการทำงาน",
     audience: "ผู้ดูแลระบบ (บทบาท \"ทั้งหมด\")",
     steps: [
       "เมื่อจบวันทำงาน กด \"🗑️ ล้างวันใหม่\" ระบบจะเก็บข้อมูลวันนี้เป็นประวัติ แล้วล้างคิว/รถให้พร้อมรับวันใหม่ (ต้องกดยืนยันอีกครั้ง)",
@@ -405,7 +405,7 @@ const MANUAL_SECTIONS = [
     notes: ["การล้างวันใหม่และลบข้อมูลย้อนหลังเป็นการกระทำที่ย้อนกลับไม่ได้ ควรตรวจสอบให้แน่ใจก่อนกดยืนยัน"],
   },
   {
-    id: "admin", emoji: "🛠️", title: "Admin – แก้ไขข้อมูลรถ",
+    id: "admin", img: "/manual/admin.png", emoji: "🛠️", title: "Admin – แก้ไขข้อมูลรถ",
     audience: "ผู้ดูแลระบบ (บทบาท \"ทั้งหมด\")",
     steps: [
       "เลือกทะเบียนรถที่ต้องการแก้ไข",
@@ -417,7 +417,7 @@ const MANUAL_SECTIONS = [
     notes: [],
   },
   {
-    id: "qr_page", emoji: "📱", title: "QR Code ทั้งหมด",
+    id: "qr_page", img: "/manual/qr_page.png", emoji: "📱", title: "QR Code ทั้งหมด",
     audience: "ผู้ดูแลระบบ – ใช้ตอนติดตั้ง/พิมพ์ QR ไปแปะหน้าสถานี",
     steps: [
       "แต่ละกล่องคือ 1 จุดใช้งาน คลิกกล่องเพื่อดู QR ขนาดใหญ่",
@@ -427,7 +427,7 @@ const MANUAL_SECTIONS = [
     notes: [],
   },
   {
-    id: "master_setting", emoji: "🔐", title: "Master Setting – ตั้งค่าระบบทั้งหมด",
+    id: "master_setting", img: "/manual/master_setting.png", emoji: "🔐", title: "Master Setting – ตั้งค่าระบบทั้งหมด",
     audience: "ผู้ดูแลระบบเท่านั้น",
     steps: [
       "เข้าหน้านี้ต้องกรอกรหัส PIN 4 หลักก่อน (ค่าเริ่มต้น 0000 — ควรเปลี่ยนทันทีหลังติดตั้งระบบ)",
@@ -519,6 +519,10 @@ const UserManualPage = ({ onClose }) => {
         <div key={sec.id} style={{ background: "#fff", border: "1px solid #e5e7eb", padding: 16, marginBottom: 14 }}>
           <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 900 }}>{sec.emoji} {sec.title}</h3>
           <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>👤 {sec.audience}</p>
+          {sec.img && (
+            <img src={sec.img} alt={sec.title} loading="lazy"
+              style={{ display: "block", width: "100%", maxWidth: 480, border: "1px solid #e5e7eb", marginBottom: 12 }} />
+          )}
           <ol style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 12.5, color: "#374151", lineHeight: 1.9 }}>
             {sec.steps.map((s, i) => <li key={i}>{s}</li>)}
           </ol>
