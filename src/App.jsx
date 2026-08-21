@@ -239,35 +239,40 @@ const printHomeQrTemplate = (url) => {
   const html = `<!doctype html>
 <html lang="th"><head><meta charset="utf-8" /><title>QR หน้ารวมการทำงาน</title>
 <style>
+  @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; }
-  body { display: flex; justify-content: center; padding: 24px; background: #fff; }
-  .card { width: 420px; border: 10px solid #f3d9ea; }
-  .header { background: #4a154b; padding: 16px 10px; text-align: center; }
-  .header h1 { color: #fff; font-size: 20px; font-weight: 900; }
-  .goldline { height: 4px; background: #e0b23c; }
-  .content { padding: 24px 20px; text-align: center; }
-  .qr { width: 260px; height: 260px; }
-  .urlbox { margin-top: 16px; background: #f3f4f6; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #374151; word-break: break-all; font-family: monospace; }
-  .howto-title { margin-top: 20px; font-weight: 900; font-size: 15px; color: #111; }
-  .step { display: flex; align-items: center; gap: 10px; background: #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 10px; text-align: left; }
-  .num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #e0b23c; color: #111; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-  .steptext { font-weight: 700; font-size: 13px; color: #111; }
-  .footer { background: #f3d9ea; padding: 14px 10px; text-align: center; }
-  .footer .fname { font-weight: 900; font-size: 15px; color: #111; }
-  .footer .sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
-  @media print { body { padding: 0; } }
+  html, body { width: 100%; height: 100%; }
+  body { display: flex; background: #fff; }
+  .card { flex: 1; display: flex; flex-direction: column; border: 16px solid #f3d9ea; box-sizing: border-box; }
+  .header { background: #4a154b; padding: 26px 32px; display: flex; align-items: center; gap: 16px; }
+  .accent { flex-shrink: 0; width: 5px; height: 34px; background: #e0b23c; }
+  .header h1 { color: #fff; font-size: 30px; font-weight: 900; letter-spacing: 0.5px; }
+  .goldline { height: 6px; background: #e0b23c; }
+  .content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 50px; gap: 30px; }
+  .qr { width: 320px; height: 320px; }
+  .urlbox { width: 100%; max-width: 440px; background: #f3f4f6; border-radius: 8px; padding: 12px 16px; font-size: 15px; color: #374151; word-break: break-all; font-family: monospace; text-align: center; }
+  .howto-title { font-weight: 900; font-size: 22px; color: #111; }
+  .steps { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 14px; }
+  .step { display: flex; align-items: center; gap: 16px; background: #e5e7eb; border-radius: 10px; padding: 16px 20px; text-align: left; }
+  .num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: #e0b23c; color: #111; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+  .steptext { font-weight: 700; font-size: 17px; color: #111; }
+  .footer { background: #f3d9ea; padding: 22px 10px; text-align: center; }
+  .footer .fname { font-weight: 900; font-size: 20px; color: #111; }
+  .footer .sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
 </style></head>
 <body>
   <div class="card">
-    <div class="header"><h1>- หน้าหลักระบบโหลดจ่าย -</h1></div>
+    <div class="header"><div class="accent"></div><h1>- หน้าหลักระบบโหลดจ่าย -</h1></div>
     <div class="goldline"></div>
     <div class="content">
       <img class="qr" src="${qrSrc}" alt="QR" />
       <div class="urlbox">${safeUrl}</div>
       <div class="howto-title">วิธีการใช้งาน</div>
-      <div class="step"><div class="num">1</div><div class="steptext">สแกน QR CODE</div></div>
-      <div class="step"><div class="num">2</div><div class="steptext">แสดงหน้าหลัก</div></div>
-      <div class="step"><div class="num">3</div><div class="steptext">เลือกฝ่ายการทำงาน / หน้าภาพรวมการทำงาน</div></div>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><div class="steptext">สแกน QR CODE</div></div>
+        <div class="step"><div class="num">2</div><div class="steptext">แสดงหน้าหลัก</div></div>
+        <div class="step"><div class="num">3</div><div class="steptext">เลือกฝ่ายการทำงาน / หน้าภาพรวมการทำงาน</div></div>
+      </div>
     </div>
     <div class="footer">
       <div class="fname">${facilityName}</div>
@@ -280,7 +285,7 @@ const printHomeQrTemplate = (url) => {
     if (img.complete) go(); else img.onload = go;
   </script>
 </body></html>`;
-  const w = window.open("", "_blank", "width=520,height=760");
+  const w = window.open("", "_blank", "width=650,height=920");
   if (!w) return;
   w.document.open();
   w.document.write(html);
