@@ -399,7 +399,7 @@ const printDashboardQrTemplate = (url) => {
 </style></head>
 <body>
   <div class="card">
-    <div class="header"><h1>- Dashboard ขนส่ง -</h1></div>
+    <div class="header"><h1>- Dashboard -</h1></div>
     <div class="goldline"></div>
     <div class="content">
       <div class="infobox">
