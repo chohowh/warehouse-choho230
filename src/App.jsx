@@ -387,9 +387,9 @@ const printDashboardQrTemplate = (url) => {
   .header h1 { color: #fff; font-size: 50px; font-weight: 900; letter-spacing: 0.5px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
-  .infobox { flex-shrink: 0; width: 100%; max-width: 700px; background: #eef2f6; border: 1.5px solid #cfe0f2; border-radius: 12px; padding: 12px 20px; text-align: center; }
-  .infobox .line1 { font-weight: 900; font-size: 26px; color: #1e293b; display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .infobox .line2 { font-size: 19px; color: #4b6079; margin-top: 3px; font-weight: 600; }
+  .infobox { flex-shrink: 0; width: 100%; max-width: 700px; background: #eef2f6; border: 1.5px solid #cfe0f2; border-radius: 12px; padding: 8px 20px; text-align: center; }
+  .infobox .line1 { font-weight: 900; font-size: 25px; color: #1e293b; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .infobox .line2 { font-size: 20px; color: #4b6079; margin-top: 4px; font-weight: 600; }
   .qrframe { flex-shrink: 0; background: #fff; border: 3px solid #1e3a8a; border-radius: 26px; padding: 36px; box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18); }
   .qr { width: 540px; height: 540px; display: block; }
   .urlbox { flex-shrink: 0; width: 100%; max-width: 740px; background: #f3f4f6; border: 1.5px dashed #9fb8d6; border-radius: 10px; padding: 6px 17px; font-size: 18px; color: #1e3a8a; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
