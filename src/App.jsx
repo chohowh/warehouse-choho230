@@ -297,12 +297,12 @@ const printHomeQrTemplate = (url) => {
 };
 
 // พิมพ์ QR "คนขับ เช็คอิน" เป็นไฟล์/หน้าเดียว ตามเทมเพลตป้ายติดหน้าโรงงาน (โทนเขียว)
-// ระยะ geofence ดึงจาก settings.geofence.radiusM สด ๆ — ตั้งค่าที่ Master Setting
+// ป้ายระยะ geofence ตรึงไว้ที่ 200 เมตรเสมอ (ไม่ตามค่าจริงที่ตั้งใน Master Setting)
 const printDriverQrTemplate = (url) => {
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(url)}`;
   const facilityName = escapeHtml(settings.facilityName);
   const safeUrl = escapeHtml(url);
-  const radiusM = escapeHtml(settings.geofence.radiusM);
+  const radiusM = 200;
   const html = `<!doctype html>
 <html lang="th"><head><meta charset="utf-8" /><title>QR คนขับ เช็คอิน</title>
 <style>
