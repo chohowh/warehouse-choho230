@@ -228,6 +228,65 @@ const saveQrImage = async (url, mode) => {
   }
 };
 
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// พิมพ์ QR "หน้ารวมการทำงาน" เป็นไฟล์/หน้าเดียว ตามเทมเพลตป้ายติดหน้าโรงงาน
+// (ชื่อโรงงานดึงจาก settings.facilityName สด ๆ — ตั้งค่าที่ Master Setting)
+const printHomeQrTemplate = (url) => {
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(url)}`;
+  const facilityName = escapeHtml(settings.facilityName);
+  const safeUrl = escapeHtml(url);
+  const html = `<!doctype html>
+<html lang="th"><head><meta charset="utf-8" /><title>QR หน้ารวมการทำงาน</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; }
+  body { display: flex; justify-content: center; padding: 24px; background: #fff; }
+  .card { width: 420px; border: 10px solid #f3d9ea; }
+  .header { background: #4a154b; padding: 16px 10px; text-align: center; }
+  .header h1 { color: #fff; font-size: 20px; font-weight: 900; }
+  .goldline { height: 4px; background: #e0b23c; }
+  .content { padding: 24px 20px; text-align: center; }
+  .qr { width: 260px; height: 260px; }
+  .urlbox { margin-top: 16px; background: #f3f4f6; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #374151; word-break: break-all; font-family: monospace; }
+  .howto-title { margin-top: 20px; font-weight: 900; font-size: 15px; color: #111; }
+  .step { display: flex; align-items: center; gap: 10px; background: #e5e7eb; border-radius: 8px; padding: 10px 14px; margin-top: 10px; text-align: left; }
+  .num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #e0b23c; color: #111; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .steptext { font-weight: 700; font-size: 13px; color: #111; }
+  .footer { background: #f3d9ea; padding: 14px 10px; text-align: center; }
+  .footer .fname { font-weight: 900; font-size: 15px; color: #111; }
+  .footer .sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  @media print { body { padding: 0; } }
+</style></head>
+<body>
+  <div class="card">
+    <div class="header"><h1>- หน้าหลักระบบโหลดจ่าย -</h1></div>
+    <div class="goldline"></div>
+    <div class="content">
+      <img class="qr" src="${qrSrc}" alt="QR" />
+      <div class="urlbox">${safeUrl}</div>
+      <div class="howto-title">วิธีการใช้งาน</div>
+      <div class="step"><div class="num">1</div><div class="steptext">สแกน QR CODE</div></div>
+      <div class="step"><div class="num">2</div><div class="steptext">แสดงหน้าหลัก</div></div>
+      <div class="step"><div class="num">3</div><div class="steptext">เลือกฝ่ายการทำงาน / หน้าภาพรวมการทำงาน</div></div>
+    </div>
+    <div class="footer">
+      <div class="fname">${facilityName}</div>
+      <div class="sub">PLP – Process Improvement</div>
+    </div>
+  </div>
+  <script>
+    var img = document.querySelector('.qr');
+    function go() { setTimeout(function () { window.print(); }, 150); }
+    if (img.complete) go(); else img.onload = go;
+  </script>
+</body></html>`;
+  const w = window.open("", "_blank", "width=520,height=760");
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+};
+
 // prefix ป้ายชื่อของ QR การ์ดที่ผูกกับลานโหลด (ตามด้วยชื่อสั้นของลานจาก wh_lanes สด ๆ) —
 // แยกจาก QR_ITEMS.label เดิมเพื่อให้แก้ชื่อ/ชื่อสั้นของลานใน Master Setting แล้วสะท้อนที่นี่ทันที
 const QR_LANE_LABEL_PREFIX = {
@@ -629,6 +688,12 @@ const QRCodePage = () => {
                 style={{ width: "100%", background: "#16a34a", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 💾 บันทึกรูป QR
               </button>
+              {zoomItem.mode === "home" && (
+                <button onClick={() => printHomeQrTemplate(url)}
+                  style={{ width: "100%", background: "#4a154b", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  🖨️ พิมพ์ป้าย QR (1 ไฟล์)
+                </button>
+              )}
               <button onClick={() => setZoomItem(null)}
                 style={{ width: "100%", background: "transparent", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 ปิด
