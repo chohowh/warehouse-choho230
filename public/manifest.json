@@ -1,6 +1,6 @@
 {
-  "name": "NBLP Loading",
-  "short_name": "NBLP Loading",
+  "name": "KB Loading",
+  "short_name": "KB Loading",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111111",

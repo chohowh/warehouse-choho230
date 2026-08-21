@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
-import { loadSettings } from './lib/settings'
+import { loadSettings, settings } from './lib/settings'
 import { loadLaneAliases, loadWaitingReasons, loadBasketTypes, loadDetailSources, loadLanes, loadRoles, loadBays } from './lib/masterData'
 
 // โหลด master data (wh_settings, wh_lane_aliases, wh_waiting_reasons, wh_basket_types,
@@ -17,6 +17,9 @@ const settingsReady = Promise.race([
 ])
 
 settingsReady.finally(() => {
+  // ตั้งชื่อแท็บจาก settings.siteTitle เสมอ (ไม่ใช่แค่ตอนที่ wh_settings มีแถว site_title)
+  // เพื่อให้หน้า Master Setting เป็นความจริงเดียวของชื่อเว็บจริงๆ
+  document.title = `${settings.siteTitle.trim()} Loading`
   createRoot(document.getElementById('root')).render(
     <StrictMode>
       <App />
