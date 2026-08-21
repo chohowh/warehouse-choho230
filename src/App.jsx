@@ -275,7 +275,7 @@ const printHomeQrTemplate = (url) => {
       <div class="steps">
         <div class="step"><div class="num">1</div><div class="steptext">สแกน QR CODE</div></div>
         <div class="step"><div class="num">2</div><div class="steptext">แสดงหน้าหลัก</div></div>
-        <div class="step"><div class="num">3</div><div class="steptext">เลือกฝ่ายการทำงาน / หน้าภาพรวมการทำงาน</div></div>
+        <div class="step"><div class="num">3</div><div class="steptext">เลือกจุดงาน</div></div>
       </div>
     </div>
     <div class="footer">
