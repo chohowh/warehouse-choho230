@@ -256,7 +256,7 @@ const printHomeQrTemplate = (url) => {
   .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
   .howto-title::before, .howto-title::after { content: ""; height: 3px; width: 32px; background: #f0c94a; border-radius: 2px; }
   .steps { flex-shrink: 0; width: 100%; max-width: 680px; display: flex; flex-direction: row; align-items: stretch; gap: 16px; }
-  .step { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 14px; padding: 14px 12px; }
+  .step { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 12px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 14px; padding: 14px 12px; }
   .num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
   .steptext { font-weight: 900; font-size: 19px; line-height: 1.2; color: #3d1140; text-align: center; }
   .footer { flex-shrink: 0; background: #f3d9ea; padding: 8px 10px 12px; text-align: center; position: relative; }
@@ -273,9 +273,9 @@ const printHomeQrTemplate = (url) => {
       <div class="urlbox">${safeUrl}</div>
       <div class="howto-title">วิธีการใช้งาน</div>
       <div class="steps">
-        <div class="step"><div class="num">1</div><div class="steptext">สแกน QR CODE</div></div>
-        <div class="step"><div class="num">2</div><div class="steptext">แสดงหน้าหลัก</div></div>
-        <div class="step"><div class="num">3</div><div class="steptext">เลือกจุดงาน</div></div>
+        <div class="step"><div class="num">1</div><div class="steptext">สแกน<br>QR CODE</div></div>
+        <div class="step"><div class="num">2</div><div class="steptext">แสดง<br>หน้าหลัก</div></div>
+        <div class="step"><div class="num">3</div><div class="steptext">เลือก<br>จุดงาน</div></div>
       </div>
     </div>
     <div class="footer">
