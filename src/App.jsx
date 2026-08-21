@@ -370,6 +370,54 @@ const printDriverQrTemplate = (url) => {
   w.document.close();
 };
 
+// พิมพ์ QR "Dashboard ขนส่ง" เป็นไฟล์/หน้าเดียว — เทมเพลตแบบมินิมอล (โทนน้ำเงิน) ไม่มีขั้นตอนใช้งาน
+const printDashboardQrTemplate = (url) => {
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(url)}`;
+  const facilityName = escapeHtml(settings.facilityName);
+  const html = `<!doctype html>
+<html lang="th"><head><meta charset="utf-8" /><title>QR Dashboard ขนส่ง</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  html, body { width: 100%; height: 100%; }
+  body { display: flex; background: #eaf2fb; }
+  .card { flex: 1; display: flex; flex-direction: column; border: 16px solid #bcd9f0; box-sizing: border-box; position: relative; overflow: hidden; min-height: 0; }
+  .header { flex-shrink: 0; background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%); padding: 30px 20px; text-align: center; }
+  .header h1 { color: #fff; font-size: 40px; font-weight: 900; letter-spacing: 0.5px; }
+  .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
+  .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 3px solid #1e3a8a; border-radius: 26px; padding: 34px; box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18); }
+  .qr { width: 540px; height: 540px; display: block; }
+  .footer { flex-shrink: 0; background: #bcd9f0; padding: 18px 10px 22px; text-align: center; }
+  .footer .fname { font-weight: 900; font-size: 23px; color: #1e293b; }
+  .footer .sub { font-size: 14px; color: #4b6079; margin-top: 4px; font-weight: 600; }
+</style></head>
+<body>
+  <div class="card">
+    <div class="header"><h1>- Dashboard ขนส่ง -</h1></div>
+    <div class="goldline"></div>
+    <div class="content">
+      <div class="qrframe"><img class="qr" src="${qrSrc}" alt="QR" /></div>
+    </div>
+    <div class="goldline"></div>
+    <div class="footer">
+      <div class="fname">${facilityName}</div>
+      <div class="sub">PLP – Process Improvement</div>
+    </div>
+  </div>
+  <script>
+    var img = document.querySelector('.qr');
+    function go() { setTimeout(function () { window.print(); }, 150); }
+    if (img.complete) go(); else img.onload = go;
+  </script>
+</body></html>`;
+  const w = window.open("", "_blank", "width=650,height=920");
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+};
+
 // prefix ป้ายชื่อของ QR การ์ดที่ผูกกับลานโหลด (ตามด้วยชื่อสั้นของลานจาก wh_lanes สด ๆ) —
 // แยกจาก QR_ITEMS.label เดิมเพื่อให้แก้ชื่อ/ชื่อสั้นของลานใน Master Setting แล้วสะท้อนที่นี่ทันที
 const QR_LANE_LABEL_PREFIX = {
@@ -780,6 +828,12 @@ const QRCodePage = () => {
               {zoomItem.mode === "driver" && (
                 <button onClick={() => printDriverQrTemplate(url)}
                   style={{ width: "100%", background: "#0f5c2c", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  🖨️ พิมพ์ป้าย QR (1 ไฟล์)
+                </button>
+              )}
+              {zoomItem.mode === "dashboard_transport" && (
+                <button onClick={() => printDashboardQrTemplate(url)}
+                  style={{ width: "100%", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                   🖨️ พิมพ์ป้าย QR (1 ไฟล์)
                 </button>
               )}
