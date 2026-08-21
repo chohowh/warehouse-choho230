@@ -178,6 +178,8 @@ const QRCodeDisplay = ({ url, size = 220 }) => (
   </div>
 );
 
+const QR_HOME_ITEM = { mode: "home", emoji: "🏠", label: "หน้ารวมการทำงาน", color: "#16a34a", bg: "#f0fdf4" };
+
 const QR_ITEMS = [
   { mode: "driver",        emoji: "🚛", label: "คนขับ เช็คอิน",     color: "#111",    bg: "#f9fafb" },
   { mode: "dashboard_transport", emoji: "📊", label: "Dashboard ขนส่ง", color: "#0ea5e9", bg: "#f0f9ff" },
@@ -245,8 +247,10 @@ const QRCodePage = () => {
   const topRowItems = items.filter(i => i.mode === "driver" || i.mode === "dashboard_transport");
   const restItems    = items.filter(i => i.mode !== "driver" && i.mode !== "dashboard_transport");
 
+  const urlForMode = mode => mode === "home" ? base : `${base}?mode=${mode}`;
+
   const renderCard = ({ mode, emoji, label, color, bg }) => {
-    const url = `${base}?mode=${mode}`;
+    const url = urlForMode(mode);
     return (
       <div key={mode} onClick={() => setZoomItem({ mode, emoji, label, color, bg })}
         style={{ background: "#fff", borderRadius: 0, padding: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: `2px solid ${color}20`, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer" }}>
@@ -283,6 +287,27 @@ const QRCodePage = () => {
           🖨️ พิมพ์ทั้งหมด
         </button>
       </div>
+      <div onClick={() => setZoomItem(QR_HOME_ITEM)}
+        style={{ background: "#fff", borderRadius: 0, marginBottom: 16, maxWidth: 360, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", border: `2px solid ${QR_HOME_ITEM.color}20`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", overflow: "hidden" }}>
+        <div style={{ width: "100%", background: QR_HOME_ITEM.color, padding: "10px 0", textAlign: "center", color: "#fff", fontWeight: 900, fontSize: 15 }}>
+          {QR_HOME_ITEM.emoji} {QR_HOME_ITEM.label}
+        </div>
+        <QRCodeDisplay url={urlForMode("home")} size={180} />
+        <div style={{ background: QR_HOME_ITEM.bg, padding: "6px 12px", fontSize: 11, color: "#374151", wordBreak: "break-all", fontFamily: "monospace", width: "100%", boxSizing: "border-box", textAlign: "center" }}>
+          {urlForMode("home")}
+        </div>
+        <div style={{ display: "flex", gap: 8, width: "100%", padding: "0 10px 10px" }}>
+          <button onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(urlForMode("home")); }}
+            style={{ flex: 1, background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            📋 คัดลอก
+          </button>
+          <a href={urlForMode("home")} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+            style={{ flex: 1, background: QR_HOME_ITEM.color, color: "#fff", border: "none", borderRadius: 0, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", textDecoration: "none", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ↗ เปิด
+          </a>
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 12 }}>
         {topRowItems.map(renderCard)}
       </div>
@@ -291,7 +316,7 @@ const QRCodePage = () => {
       </div>
 
       {zoomItem && (() => {
-        const url = `${base}?mode=${zoomItem.mode}`;
+        const url = urlForMode(zoomItem.mode);
         return (
           <div onClick={() => setZoomItem(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out" }}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 0, padding: 28, maxWidth: 360, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 14, cursor: "default" }}>
