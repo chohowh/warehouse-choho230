@@ -240,32 +240,36 @@ const printHomeQrTemplate = (url) => {
 <html lang="th"><head><meta charset="utf-8" /><title>QR หน้ารวมการทำงาน</title>
 <style>
   @page { size: A4; margin: 0; }
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Sarabun', sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   html, body { width: 100%; height: 100%; }
-  body { display: flex; background: #fff; }
-  .card { flex: 1; display: flex; flex-direction: column; border: 16px solid #f3d9ea; box-sizing: border-box; }
-  .header { background: #4a154b; padding: 26px 32px; display: flex; align-items: center; gap: 16px; }
-  .accent { flex-shrink: 0; width: 5px; height: 34px; background: #e0b23c; }
-  .header h1 { color: #fff; font-size: 30px; font-weight: 900; letter-spacing: 0.5px; }
-  .goldline { height: 6px; background: #e0b23c; }
-  .content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 50px; gap: 30px; }
-  .qr { width: 320px; height: 320px; }
-  .urlbox { width: 100%; max-width: 440px; background: #f3f4f6; border-radius: 8px; padding: 12px 16px; font-size: 15px; color: #374151; word-break: break-all; font-family: monospace; text-align: center; }
-  .howto-title { font-weight: 900; font-size: 22px; color: #111; }
-  .steps { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 14px; }
-  .step { display: flex; align-items: center; gap: 16px; background: #e5e7eb; border-radius: 10px; padding: 16px 20px; text-align: left; }
-  .num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: #e0b23c; color: #111; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; }
-  .steptext { font-weight: 700; font-size: 17px; color: #111; }
-  .footer { background: #f3d9ea; padding: 22px 10px; text-align: center; }
-  .footer .fname { font-weight: 900; font-size: 20px; color: #111; }
-  .footer .sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+  body { display: flex; background: #fdf3f9; }
+  .card { flex: 1; display: flex; flex-direction: column; border: 16px solid #f3d9ea; box-sizing: border-box; position: relative; overflow: hidden; min-height: 0; }
+  .header { flex-shrink: 0; background: linear-gradient(135deg, #5a1a5c 0%, #3d1140 100%); padding: 26px 36px; display: flex; align-items: center; gap: 16px; }
+  .accent { flex-shrink: 0; width: 6px; height: 40px; border-radius: 4px; background: #f0c94a; }
+  .header .icon { font-size: 34px; line-height: 1; }
+  .header h1 { color: #fff; font-size: 34px; font-weight: 900; letter-spacing: 0.5px; }
+  .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
+  .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 26px 55px; gap: 20px; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 16px; padding: 14px; box-shadow: 0 8px 24px rgba(74, 21, 75, 0.18); }
+  .qr { width: 280px; height: 280px; display: block; }
+  .urlbox { flex-shrink: 0; width: 100%; max-width: 460px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 10px 16px; font-size: 16px; color: #4a154b; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
+  .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
+  .howto-title::before, .howto-title::after { content: ""; height: 3px; width: 32px; background: #f0c94a; border-radius: 2px; }
+  .steps { flex-shrink: 0; width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
+  .step { display: flex; align-items: center; gap: 16px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 12px; padding: 12px 22px; text-align: left; }
+  .num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+  .steptext { font-weight: 700; font-size: 19px; color: #3d1140; }
+  .footer { flex-shrink: 0; background: #f3d9ea; padding: 18px 10px 22px; text-align: center; position: relative; }
+  .footer::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
+  .footer .fname { font-weight: 900; font-size: 23px; color: #3d1140; }
+  .footer .sub { font-size: 14px; color: #8a5a86; margin-top: 4px; font-weight: 600; }
 </style></head>
 <body>
   <div class="card">
-    <div class="header"><div class="accent"></div><h1>- หน้าหลักระบบโหลดจ่าย -</h1></div>
+    <div class="header"><div class="accent"></div><span class="icon">🏭</span><h1>- หน้าหลักระบบโหลดจ่าย -</h1></div>
     <div class="goldline"></div>
     <div class="content">
-      <img class="qr" src="${qrSrc}" alt="QR" />
+      <div class="qrframe"><img class="qr" src="${qrSrc}" alt="QR" /></div>
       <div class="urlbox">${safeUrl}</div>
       <div class="howto-title">วิธีการใช้งาน</div>
       <div class="steps">
