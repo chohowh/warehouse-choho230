@@ -250,13 +250,13 @@ const printHomeQrTemplate = (url) => {
   .header h1 { color: #fff; font-size: 34px; font-weight: 900; letter-spacing: 0.5px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 26px 55px; gap: 28px; }
-  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 18px; padding: 20px; box-shadow: 0 8px 24px rgba(74, 21, 75, 0.18); }
-  .qr { width: 340px; height: 340px; display: block; }
-  .urlbox { flex-shrink: 0; width: 100%; max-width: 480px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 14px 20px; font-size: 19px; color: #4a154b; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
-  .howto-title { flex-shrink: 0; font-weight: 900; font-size: 30px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 20px; padding: 26px; box-shadow: 0 8px 24px rgba(74, 21, 75, 0.18); }
+  .qr { width: 450px; height: 450px; display: block; }
+  .urlbox { flex-shrink: 0; width: 100%; max-width: 480px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 5px 17px; font-size: 16px; color: #4a154b; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
+  .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
   .howto-title::before, .howto-title::after { content: ""; height: 3px; width: 32px; background: #f0c94a; border-radius: 2px; }
   .steps { flex-shrink: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 14px; }
-  .step { display: flex; align-items: center; gap: 20px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 12px; padding: 18px 26px; text-align: left; }
+  .step { display: flex; align-items: center; gap: 20px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 12px; padding: 18px 30px; text-align: left; }
   .num { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
   .steptext { font-weight: 700; font-size: 23px; color: #3d1140; }
   .footer { flex-shrink: 0; background: #f3d9ea; padding: 18px 10px 22px; text-align: center; position: relative; }
