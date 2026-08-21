@@ -314,7 +314,7 @@ const printDriverQrTemplate = (url) => {
   .header { flex-shrink: 0; background: linear-gradient(135deg, #16803d 0%, #0f5c2c 100%); padding: 26px 36px; display: flex; align-items: center; gap: 16px; }
   .accent { flex-shrink: 0; width: 6px; height: 46px; border-radius: 4px; background: #f0c94a; }
   .header .icon { font-size: 38px; line-height: 1; }
-  .header h1 { color: #fff; font-size: 40px; font-weight: 900; letter-spacing: 0.5px; }
+  .header h1 { color: #fff; font-size: 44px; font-weight: 900; letter-spacing: 0.5px; }
   .header h1 u { text-decoration: none; border-bottom: 4px solid #f0c94a; padding-bottom: 2px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 55px; gap: 10px; }
@@ -336,7 +336,7 @@ const printDriverQrTemplate = (url) => {
 </style></head>
 <body>
   <div class="card">
-    <div class="header"><div class="accent"></div><span class="icon">🚚</span><h1>สแกนเข้าโรงงาน <u>"เช็คอิน"</u></h1></div>
+    <div class="header"><div class="accent"></div><span class="icon">🚚</span><h1>สแกนเข้าโรงงาน <u>"รับสินค้า"</u></h1></div>
     <div class="goldline"></div>
     <div class="content">
       <div class="infobox">
