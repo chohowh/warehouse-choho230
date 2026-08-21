@@ -256,9 +256,9 @@ const printHomeQrTemplate = (url) => {
   .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #4a154b; display: flex; align-items: center; gap: 10px; }
   .howto-title::before, .howto-title::after { content: ""; height: 3px; width: 32px; background: #f0c94a; border-radius: 2px; }
   .steps { flex-shrink: 0; width: 100%; max-width: 640px; display: flex; flex-direction: row; align-items: stretch; gap: 16px; }
-  .step { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 14px; padding: 24px 10px 16px; text-align: center; }
-  .num { position: absolute; top: -15px; left: 16px; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); border: 3px solid #fff; }
-  .steptext { font-weight: 900; font-size: 19px; line-height: 1.3; color: #3d1140; }
+  .step { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; background: #f6eefb; border: 1.5px solid #e7d3ef; border-radius: 14px; padding: 14px 12px; }
+  .num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #f5d76e, #d89b1f); color: #3d1140; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+  .steptext { font-weight: 900; font-size: 19px; line-height: 1.2; color: #3d1140; text-align: center; }
   .footer { flex-shrink: 0; background: #f3d9ea; padding: 8px 10px 12px; text-align: center; position: relative; }
   .footer::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .footer .fname { font-weight: 900; font-size: 23px; color: #3d1140; }
