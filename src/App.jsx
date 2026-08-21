@@ -318,11 +318,11 @@ const printDriverQrTemplate = (url) => {
   .header h1 u { text-decoration: none; border-bottom: 4px solid #f0c94a; padding-bottom: 2px; }
   .goldline { flex-shrink: 0; height: 6px; background: linear-gradient(90deg, #f0c94a, #d89b1f, #f0c94a); }
   .content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 55px; gap: 10px; }
-  .infobox { flex-shrink: 0; width: 100%; max-width: 628px; background: #eef2f6; border: 1.5px solid #dbe3ea; border-radius: 12px; padding: 16px 20px; text-align: center; }
+  .infobox { flex-shrink: 0; width: 100%; max-width: 628px; background: #eef2f6; border: 1.5px solid #dbe3ea; border-radius: 12px; padding: 8px 20px; text-align: center; }
   .infobox .line1 { font-weight: 900; font-size: 25px; color: #1f2937; display: flex; align-items: center; justify-content: center; gap: 10px; }
   .infobox .line2 { font-size: 20px; color: #4b5563; margin-top: 4px; font-weight: 600; }
-  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 22px; padding: 26px; box-shadow: 0 8px 24px rgba(15, 92, 44, 0.18); }
-  .qr { width: 460px; height: 460px; display: block; }
+  .qrframe { flex-shrink: 0; background: #fff; border: 2px solid #f0c94a; border-radius: 22px; padding: 30px; box-shadow: 0 8px 24px rgba(15, 92, 44, 0.18); }
+  .qr { width: 520px; height: 520px; display: block; }
   .urlbox { flex-shrink: 0; width: 100%; max-width: 628px; background: #f3f4f6; border: 1.5px dashed #c9c9d4; border-radius: 10px; padding: 5px 17px; font-size: 16px; color: #0f5c2c; word-break: break-all; font-family: monospace; text-align: center; font-weight: 700; }
   .howto-title { flex-shrink: 0; font-weight: 900; font-size: 24px; color: #0f5c2c; }
   .steps { flex-shrink: 0; width: 100%; max-width: 720px; display: flex; flex-direction: row; align-items: stretch; gap: 16px; }
