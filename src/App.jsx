@@ -832,19 +832,19 @@ const QRCodePage = () => {
               {zoomItem.mode === "home" && (
                 <button onClick={() => printHomeQrTemplate(url)}
                   style={{ width: "100%", background: "#4a154b", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  🖨️ พิมพ์ป้าย QR (1 ไฟล์)
+                  🖨️ พิมพ์ป้าย QR Code ทั้ง 3 กล่อง
                 </button>
               )}
               {zoomItem.mode === "driver" && (
                 <button onClick={() => printDriverQrTemplate(url)}
                   style={{ width: "100%", background: "#0f5c2c", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  🖨️ พิมพ์ป้าย QR (1 ไฟล์)
+                  🖨️ พิมพ์ป้าย QR Code ทั้ง 3 กล่อง
                 </button>
               )}
               {zoomItem.mode === "dashboard_transport" && (
                 <button onClick={() => printDashboardQrTemplate(url)}
                   style={{ width: "100%", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 0, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  🖨️ พิมพ์ป้าย QR (1 ไฟล์)
+                  🖨️ พิมพ์ป้าย QR Code ทั้ง 3 กล่อง
                 </button>
               )}
               <button onClick={() => setZoomItem(null)}
