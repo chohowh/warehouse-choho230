@@ -101,7 +101,7 @@ const compressImage = file => new Promise((resolve, reject) => {
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
+      resolve(canvas.toDataURL("image/jpeg", 0.5));
     };
   };
 });
@@ -3912,8 +3912,8 @@ const SystemSettings = () => {
       return "เวลาตัดรอบวันทำงานต้องเป็นตัวเลข 0-23";
     if (!Number.isFinite(n(form.waitingUrgentMinutes)) || n(form.waitingUrgentMinutes) <= 0)
       return "นาทีที่ถึงจะขึ้น urgent ต้องมากกว่า 0";
-    if (!Number.isFinite(n(form.maxPhotoUploads)) || n(form.maxPhotoUploads) <= 0)
-      return "จำนวนรูปสูงสุดต้องมากกว่า 0";
+    if (!Number.isFinite(n(form.maxPhotoUploads)) || n(form.maxPhotoUploads) < 1 || n(form.maxPhotoUploads) > 15)
+      return "จำนวนรูปสูงสุดต้องอยู่ระหว่าง 1-15 รูป";
     if (!Number.isFinite(n(form.maxWaitingReasons)) || n(form.maxWaitingReasons) <= 0)
       return "จำนวนเหตุผลรอสินค้าสูงสุดต้องมากกว่า 0";
     if (!Number.isFinite(n(form.geofenceLat)) || !Number.isFinite(n(form.geofenceLng)) || String(form.geofenceLat).trim() === "" || String(form.geofenceLng).trim() === "")
@@ -3975,8 +3975,8 @@ const SystemSettings = () => {
           <input type="number" min="1" value={form.waitingUrgentMinutes} onChange={set("waitingUrgentMinutes")} style={inp} />
         </div>
         <div>
-          <label style={lbl}>จำนวนรูปสูงสุดต่อครั้ง</label>
-          <input type="number" min="1" value={form.maxPhotoUploads} onChange={set("maxPhotoUploads")} style={inp} />
+          <label style={lbl}>จำนวนรูปสูงสุดต่อครั้ง (1-15)</label>
+          <input type="number" min="1" max="15" value={form.maxPhotoUploads} onChange={set("maxPhotoUploads")} style={inp} />
         </div>
         <div>
           <label style={lbl}>จำนวนเหตุผลรอสินค้าสูงสุด</label>
@@ -5784,16 +5784,23 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
 
   const thBase = { padding: "7px 10px", fontWeight: 700, whiteSpace: "nowrap", userSelect: "none", borderRight: "1px solid rgba(255,255,255,0.18)" };
 
+  const deltaLabel = diff => {
+    if (diff == null) return "";
+    const late = diff > 0;
+    return `${late ? "-" : "+"}${formatMinsDelta(Math.abs(diff))}`;
+  };
+
   const exportExcel = () => {
     const rows = sorted.map(t => {
       const q = getQ(t);
-      const stdDiff = q?.entryTime && t.arrivedAt ? workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime) : null;
+      const entryDiff = q?.entryTime && t.arrivedAt ? workTimeValue(t.arrivedAt) - workTimeValue(q.entryTime) : null;
+      const exitDiff  = q?.exitTime && t.invoicedAt ? workTimeValue(t.invoicedAt) - workTimeValue(q.exitTime) : null;
       return {
         "ทะเบียน":               t.plate || "",
         "กลุ่มลูกค้า":           t.customerGroup || "",
         "STD เข้า":              q?.entryTime || "",
         "ACT เข้า":              t.arrivedAt || "",
-        "ต่าง STD (นาที)":       stdDiff ?? "",
+        "เข้าเร็ว/ช้า":          deltaLabel(entryDiff),
         "พิมพ์ใบเบิก":           t.pickingAt || "",
         "ตรวจอุณหภูมิรถ ชิ้นส่วน": t.qcLanes?.lane_parts?.doneAt || "",
         "QC ชิ้นส่วน":            t.sampleLanes?.lane_parts?.doneAt || "",
@@ -5807,6 +5814,7 @@ const WorkTracking = ({ trucks, queue, detailMapByChannel = {}, masterLane = [] 
         "ใบสรุป":                t.summaryPrintedAt || "",
         "Invoice":               t.invoicedAt || "",
         "STD ออก":               q?.exitTime || "",
+        "ออกเร็ว/ช้า":           deltaLabel(exitDiff),
       };
     });
     const ws = XLSX.utils.json_to_sheet(rows);
