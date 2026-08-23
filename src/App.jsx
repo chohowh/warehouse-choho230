@@ -532,9 +532,11 @@ const MANUAL_SECTIONS = [
       "ตรวจสอบตารางตัวอย่างข้อมูลที่ระบบอ่านได้ (ทะเบียน/วันที่/Zone/เวลาเข้า-ออก/กลุ่มลูกค้า)",
       "กด \"✅ ยืนยัน — ตั้งคิวรถ N คัน\" เพื่อบันทึกเป็นคิวของวันนี้",
       "แก้ไข/ลบ/เพิ่มรายการรถแบบ Manual ได้ที่ตารางคิวด้านล่าง",
+      "แท็บ \"🗓️ อัพโหลดล่วงหน้า\" ใช้อัพคิวของวันทำงานถัดไปไว้ก่อนได้เลย โดยไม่กระทบคิววันนี้",
     ],
     notes: [
-      "การยืนยันไฟล์ใหม่จะ \"แทนที่คิวเดิมทั้งหมด\" ไม่ใช่การเพิ่มต่อ — ถ้ามีรถเช็คอินไปแล้ว ระบบจะจับคู่ทะเบียนกับคิวใหม่ให้อัตโนมัติ",
+      "การยืนยันไฟล์ใหม่ในแท็บ \"คิวรถวันนี้\" จะ \"แทนที่คิวเดิมทั้งหมด\" ไม่ใช่การเพิ่มต่อ — ถ้ามีรถเช็คอินไปแล้ว ระบบจะจับคู่ทะเบียนกับคิวใหม่ให้อัตโนมัติ",
+      "คิวที่อัพในแท็บ \"อัพโหลดล่วงหน้า\" จะถูกดึงมาใช้แทนคิวปัจจุบันเองอัตโนมัติ ทันทีที่ข้ามเวลาตัดรอบวันทำงาน พร้อมปิดยอด/เก็บข้อมูลวันเก่าเข้าประวัติให้เอง ไม่ต้องกด Reset",
       "ระบบอ่านข้อมูลตามตำแหน่งคอลัมน์ที่ตายตัว ต้องใช้ไฟล์รูปแบบเดิมเสมอ",
     ],
   },
@@ -1580,13 +1582,15 @@ const displayDate = (dateStr, exitTime) => {
   return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
 };
 
-const LGUpload = ({ queue, onSetQueue }) => {
+const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearPendingQueue }) => {
   const isMobile = useIsMobile();
+  const [mode,     setMode]     = useState("today"); // "today" | "advance"
   const [fileName, setFileName] = useState("");
   const [status,   setStatus]   = useState("idle"); // idle | preview | uploading | done | error
   const [extracted, setExtracted] = useState([]);
   const [errMsg,   setErrMsg]   = useState("");
   const [savedCount, setSavedCount] = useState(0);
+  const [clearingPending, setClearingPending] = useState(false);
   const [editId,   setEditId]   = useState(null);
   const [editData, setEditData] = useState({});
 
@@ -1698,7 +1702,11 @@ const LGUpload = ({ queue, onSetQueue }) => {
     setStatus("uploading");
     setErrMsg("");
     try {
-      await onSetQueue(newQueue);
+      if (mode === "advance") {
+        await onSetPendingQueue(newQueue, fileName);
+      } else {
+        await onSetQueue(newQueue);
+      }
       setSavedCount(newQueue.length);
       setStatus("done");
       setExtracted([]);
@@ -1709,10 +1717,62 @@ const LGUpload = ({ queue, onSetQueue }) => {
     }
   };
 
+  const clearPending = async () => {
+    if (!window.confirm("ยกเลิกคิวรถล่วงหน้าที่อัพโหลดไว้?")) return;
+    setClearingPending(true);
+    try {
+      await onClearPendingQueue();
+    } catch (e) {
+      alert("ยกเลิกไม่สำเร็จ: " + e.message);
+    } finally {
+      setClearingPending(false);
+    }
+  };
+
   return (
     <div>
       <h2 style={{ margin: "0 0 4px", fontWeight: 900, fontSize: 22 }}>🤝 LG → Upload ตารางคิวรถ</h2>
       <p style={{ margin: "0 0 18px", fontSize: 13, color: "#6b7280" }}>ไฟล์ Export จาก Axons Move — DPI04000 (รายงาน Scheduling)</p>
+
+      {/* Mode tabs: อัพวันนี้ vs อัพล่วงหน้า */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[
+          { id: "today",   label: "📋 คิวรถวันนี้" },
+          { id: "advance", label: "🗓️ อัพโหลดล่วงหน้า" },
+        ].map(m => (
+          <button key={m.id} onClick={() => { setMode(m.id); setStatus("idle"); setFileName(""); setExtracted([]); setErrMsg(""); }}
+            style={{
+              flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              border: mode === m.id ? "1.5px solid #111" : "1.5px solid #d1d5db",
+              background: mode === m.id ? "#111" : "#fff", color: mode === m.id ? "#fff" : "#374151",
+              borderRadius: 0,
+            }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "advance" && (
+        <div style={{ padding: "12px 16px", background: "#eff6ff", borderRadius: 0, color: "#1e3a8a", fontSize: 12.5, marginBottom: 14, lineHeight: 1.6 }}>
+          ใช้แท็บนี้เพื่ออัพโหลดคิวรถของ<b>วันทำงานถัดไป</b>ล่วงหน้าได้เลย โดยไม่กระทบคิวของวันนี้ —
+          ระบบจะดึงคิวนี้มาใช้เป็น "คิวรถวันปัจจุบัน" ให้อัตโนมัติทันทีที่ข้ามเวลาตัดรอบวันทำงาน (ประมาณ {String(settings.workDayCutoffHour).padStart(2, "0")}:00 น.)
+          พร้อมปิดยอด/เก็บข้อมูลของวันเก่าเข้าประวัติให้เองโดยไม่ต้องกด Reset
+        </div>
+      )}
+
+      {/* Pending advance-queue status */}
+      {pendingQueue && Array.isArray(pendingQueue.rows) && (
+        <div style={{ padding: "14px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 0, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ fontSize: 12.5, color: "#92400e", lineHeight: 1.6 }}>
+            ⏳ มีคิวรถล่วงหน้ารออยู่ <b>{pendingQueue.rows.length} คัน</b> ({pendingQueue.fileName || "ไม่ทราบชื่อไฟล์"})
+            <br />จะถูกใช้งานอัตโนมัติเป็นคิวของวันที่ <b>{new Date(pendingQueue.forDate).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</b>
+          </div>
+          <button onClick={clearPending} disabled={clearingPending}
+            style={{ background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 0, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: clearingPending ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+            {clearingPending ? "..." : "ยกเลิกคิวล่วงหน้า"}
+          </button>
+        </div>
+      )}
 
       {/* Upload zone */}
       <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: fileName ? "#f0fdf4" : "#fafafa", border: `2px dashed ${fileName ? "#6ee7b7" : "#d1d5db"}`, borderRadius: 0, padding: 30, textAlign: "center", cursor: "pointer", marginBottom: 14 }}>
@@ -1780,7 +1840,7 @@ const LGUpload = ({ queue, onSetQueue }) => {
           <div style={{ padding: 16 }}>
             <button onClick={handleConfirm} disabled={status === "uploading"}
               style={{ width: "100%", background: status === "uploading" ? "#6ee7b7" : "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: status === "uploading" ? "not-allowed" : "pointer" }}>
-              {status === "uploading" ? "⏳ กำลังบันทึก..." : `✅ ยืนยัน — ตั้งคิวรถ ${extracted.length} คัน`}
+              {status === "uploading" ? "⏳ กำลังบันทึก..." : mode === "advance" ? `✅ ยืนยัน — บันทึกคิวรถล่วงหน้า ${extracted.length} คัน` : `✅ ยืนยัน — ตั้งคิวรถ ${extracted.length} คัน`}
             </button>
           </div>
         </div>
@@ -1788,12 +1848,14 @@ const LGUpload = ({ queue, onSetQueue }) => {
 
       {status === "done" && (
         <div style={{ padding: "13px 16px", background: "#d1fae5", borderRadius: 0, color: "#065f46", fontWeight: 700, marginBottom: 14 }}>
-          ✅ ตั้งคิวรถเรียบร้อย {savedCount} คัน — พร้อมให้คนขับ Scan เข้า
+          {mode === "advance"
+            ? `✅ บันทึกคิวรถล่วงหน้าเรียบร้อย ${savedCount} คัน — จะใช้งานอัตโนมัติเมื่อขึ้นวันทำงานถัดไป`
+            : `✅ ตั้งคิวรถเรียบร้อย ${savedCount} คัน — พร้อมให้คนขับ Scan เข้า`}
         </div>
       )}
 
       {/* Current queue list */}
-      {queue.length > 0 && (() => {
+      {mode === "today" && queue.length > 0 && (() => {
         const filteredQueue = queue.filter(q => q.plate.includes(searchQuery));
         return (
         <div style={{ background: "#fff", borderRadius: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)", overflow: "hidden" }}>
@@ -2920,6 +2982,17 @@ const cycleDateStr = () => {
   if (d.getHours() < settings.workDayCutoffHour) d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+
+// เลื่อนวันที่ (รูปแบบ cycleDateStr เดียวกัน) ไปกี่วันก็ได้ — ใช้คำนวณ "วันทำงานถัดไป/ก่อนหน้า"
+const addDaysToDateStr = (dateStr, days) => {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// วันทำงานที่จะเริ่มขึ้นเมื่อข้ามเวลาตัดรอบครั้งถัดไป — ใช้ตอนอัพโหลดคิวรถ "ล่วงหน้า" จาก LG
+// เพื่อรู้ว่าคิวที่อัพนี้ควรถูกดึงมาใช้เป็นคิวปัจจุบันตอนไหน (ดู promotePendingQueueIfDue ใน App())
+const nextCycleDateStr = () => addDaysToDateStr(cycleDateStr(), 1);
 
 // doneAt is just "HH:mm"; events before the cutoff belong to the work-day's
 // *next* calendar date (truck loaded after midnight, e.g. 00:14, still files under
@@ -6164,6 +6237,7 @@ const LaneSelect = ({ tabs, roleLabel, onSelect, onBack }) => (
 const fetchQueue  = async () => { const { data } = await supabase.from("wh_queue").select("*");  return (data || []).map(r => r.data).sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity)); };
 const fetchTrucks = async () => { const { data, error } = await supabase.from("wh_trucks").select("*"); if (error) throw error; return (data || []).map(r => r.data); };
 const fetchMaster = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "master"); return data && data[0] ? (data[0].data || []) : []; };
+const fetchPendingQueue = async () => { const { data } = await supabase.from("wh_master").select("*").eq("id", "pending_queue"); return data && data[0] ? (data[0].data || null) : null; };
 const fetchDetailSrc = async (date = cycleDateStr()) => {
   const ids = detailSources.map(s => `detail_${s.id}_${date}`);
   const { data } = await supabase.from("wh_master").select("*").in("id", ids);
@@ -6198,6 +6272,7 @@ export default function App() {
   const handleChangeRole = () => { setRole(""); setTab("dashboard"); setPrevTab(null); };
   const [queue,      setQueue]      = useState([]);
   const [trucks,     setTrucks]     = useState([]);
+  const [pendingQueue, setPendingQueue] = useState(null); // คิวรถที่ LG อัพโหลดล่วงหน้า รอถูกดึงมาใช้เป็นคิวปัจจุบัน
   const [masterLane, setMasterLane] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wh_master_cache") || "[]"); } catch { return []; }
   });
@@ -6230,6 +6305,7 @@ export default function App() {
   useEffect(() => {
     fetchQueue().then(setQueue);
     fetchTrucks().then(setTrucks).catch(err => console.error("fetchTrucks failed:", err));
+    fetchPendingQueue().then(setPendingQueue);
     fetchMaster().then(rows => {
       if (rows.length > 0) {
         setMasterLane(rows);
@@ -6240,9 +6316,50 @@ export default function App() {
     const channel = supabase.channel("app-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "wh_queue" },  () => fetchQueue().then(setQueue))
       .on("postgres_changes", { event: "*", schema: "public", table: "wh_trucks" }, () => fetchTrucks().then(setTrucks).catch(err => console.error("fetchTrucks failed:", err)))
+      .on("postgres_changes", { event: "*", schema: "public", table: "wh_master", filter: "id=eq.pending_queue" }, () => fetchPendingQueue().then(setPendingQueue))
       .subscribe();
 
     return () => supabase.removeChannel(channel);
+  }, []);
+
+  // คิวรถล่วงหน้า (อัพจาก LG) → ดึงมาใช้เป็นคิวปัจจุบันอัตโนมัติทันทีที่ข้ามเวลาตัดรอบวันทำงาน
+  // เช็คทุก 60 วิ (ไม่มี cron ฝั่ง server จึงอาศัยเครื่องที่เปิดหน้านี้ค้างไว้เป็นตัวจับเวลาแทน) —
+  // ใช้ >= แทน === เทียบวันที่ กันกรณีไม่มีเครื่องไหนเปิดหน้าทิ้งไว้ตอนข้ามรอบพอดี (เช่น วันหยุดยาว)
+  // แล้วพลาดจังหวะไปเลย
+  useEffect(() => {
+    const promoteIfDue = async () => {
+      try {
+        const pending = await fetchPendingQueue();
+        if (!pending || !Array.isArray(pending.rows) || !pending.forDate) return;
+        if (pending.forDate > cycleDateStr()) return;
+
+        const archiveDate = addDaysToDateStr(cycleDateStr(), -1);
+        const [{ data: curQueueRows }, { data: curTruckRows }] = await Promise.all([
+          supabase.from("wh_queue").select("*"),
+          supabase.from("wh_trucks").select("*"),
+        ]);
+        await supabase.from("wh_archive").upsert({
+          archive_date: archiveDate,
+          queue:  (curQueueRows  || []).map(r => r.data),
+          trucks: (curTruckRows || []).map(r => r.data),
+        });
+        await supabase.from("wh_trucks").delete().neq("id", "");
+        await supabase.from("wh_queue").delete().neq("id", "");
+        if (pending.rows.length > 0) {
+          await supabase.from("wh_queue").upsert(pending.rows.map(q => ({ id: q.id, data: q })));
+        }
+        await supabase.from("wh_master").delete().eq("id", "pending_queue");
+
+        fetchQueue().then(setQueue);
+        fetchTrucks().then(setTrucks).catch(() => {});
+        setPendingQueue(null);
+      } catch (e) {
+        console.error("promoteIfDue (pending queue) failed:", e);
+      }
+    };
+    promoteIfDue();
+    const id = setInterval(promoteIfDue, 60000);
+    return () => clearInterval(id);
   }, []);
 
   // Recompute detailMapByChannel whenever masterLane or source files change
@@ -6361,6 +6478,21 @@ export default function App() {
       usedQueueIds.add(match.id);
       await supabase.from("wh_trucks").upsert({ id: truck.id, data: { ...truck, plate: match.plate, customerGroup: match.customerGroup, zone: match.zone, queueId: match.id, entryTime: match.entryTime, exitTime: match.exitTime } });
     }
+  };
+
+  // คิวรถ "ล่วงหน้า" ที่ LG อัพไว้ล่วงหน้าสำหรับวันทำงานถัดไป — เก็บแยกจากคิวปัจจุบันใน wh_master
+  // แล้วให้ promoteIfDue (ใน useEffect ด้านบน) ดึงมาใช้แทนคิวปัจจุบันเองตอนข้ามเวลาตัดรอบ
+  const handleSetPendingQueue = async (rows, fileName) => {
+    const payload = { rows, fileName, forDate: nextCycleDateStr(), uploadedAt: new Date().toISOString() };
+    const { error } = await supabase.from("wh_master").upsert({ id: "pending_queue", data: payload });
+    if (error) throw new Error(error.message);
+    setPendingQueue(payload);
+  };
+
+  const handleClearPendingQueue = async () => {
+    const { error } = await supabase.from("wh_master").delete().eq("id", "pending_queue");
+    if (error) throw new Error(error.message);
+    setPendingQueue(null);
   };
 
   const badge = {
@@ -6624,7 +6756,7 @@ export default function App() {
         {tab === "basket_summary" && <BasketSummary trucks={trucks} />}
         {tab === "waiting_summary" && <WaitingSummary trucks={trucks} />}
         {tab === "qr"        && <QRCodePage />}
-        {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} />}
+        {tab === "lg"        && <LGUpload queue={queue} onSetQueue={handleSetQueue} pendingQueue={pendingQueue} onSetPendingQueue={handleSetPendingQueue} onClearPendingQueue={handleClearPendingQueue} />}
         {tab === "driver"    && <DriverScan queue={queue} trucks={trucks} onScan={handleScan} skipGeofence />}
         {tab === "picking"   && <Picking trucks={trucks} queue={queue} onUpdate={handleUpdate} detailMapByChannel={detailMapByChannel} />}
         {tab === "qc_parts"  && <QC trucks={trucks} onUpdate={handleUpdate} laneId="lane_parts" detailMapByChannel={detailMapByChannel} onBack={() => setTab(prevTab)} />}
