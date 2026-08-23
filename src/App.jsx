@@ -6333,16 +6333,27 @@ export default function App() {
         if (!pending || !Array.isArray(pending.rows) || !pending.forDate) return;
         if (pending.forDate > cycleDateStr()) return;
 
-        const archiveDate = addDaysToDateStr(cycleDateStr(), -1);
-        const [{ data: curQueueRows }, { data: curTruckRows }] = await Promise.all([
+        // วันที่ปิดจริงคือ "วันก่อนหน้าที่คิวใหม่จะมีผล" เสมอ ไม่ใช่ cycleDateStr() ปัจจุบัน —
+        // เพราะถ้าไม่มีเครื่องไหนเปิดค้างไว้พอดีตอนข้ามรอบ กว่าจะมีเครื่องมาเช็คซ้ำอีกที cycleDateStr()
+        // อาจเลยวันที่ตั้งใจไว้ไปแล้วหลายวัน คำนวณจาก forDate จึงได้วันที่ถูกต้องเสมอ
+        const archiveDate = addDaysToDateStr(pending.forDate, -1);
+
+        const [{ data: curQueueRows, error: qErr }, { data: curTruckRows, error: tErr }] = await Promise.all([
           supabase.from("wh_queue").select("*"),
           supabase.from("wh_trucks").select("*"),
         ]);
-        await supabase.from("wh_archive").upsert({
+        // ถ้าอ่านข้อมูลปัจจุบันไม่สำเร็จ ห้ามลบต่อ ไม่งั้นจะเก็บ archive เป็นค่าว่างแล้วลบของจริงทิ้งจริง —
+        // ปล่อยผ่านรอบนี้ไป รอบถัดไป (60 วิ) จะลองใหม่ เพราะยังไม่ได้แตะข้อมูลอะไรเลย
+        if (qErr || tErr) { console.error("promoteIfDue: อ่านคิว/รถปัจจุบันไม่สำเร็จ, ข้ามรอบนี้", qErr || tErr); return; }
+
+        const { error: archErr } = await supabase.from("wh_archive").upsert({
           archive_date: archiveDate,
           queue:  (curQueueRows  || []).map(r => r.data),
           trucks: (curTruckRows || []).map(r => r.data),
         });
+        // เก็บ archive ไม่สำเร็จ ก็ห้ามลบข้อมูลจริงทิ้งเช่นกัน — ไม่งั้นข้อมูลของวันที่ปิดจะหายถาวร
+        if (archErr) { console.error("promoteIfDue: บันทึก archive ไม่สำเร็จ, ข้ามรอบนี้", archErr); return; }
+
         await supabase.from("wh_trucks").delete().neq("id", "");
         await supabase.from("wh_queue").delete().neq("id", "");
         if (pending.rows.length > 0) {
