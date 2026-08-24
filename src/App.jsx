@@ -1576,6 +1576,35 @@ const addMinutesToHHMM = (hhmm, mins) => {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 };
 
+// เวลาออกจากโรงงานถูกคำนวณและบันทึกทับไว้ใน wh_queue/wh_master(pending_queue) ตอนอัพโหลด/แก้ไข —
+// ถ้าแค่เปลี่ยนค่า "เวลาทำเอกสาร" ที่ Master Setting เฉยๆ แถวคิวที่มีอยู่แล้วจะไม่ขยับตาม (ค้างค่าที่คำนวณไว้ครั้งก่อน)
+// ฟังก์ชันนี้จึงไล่คำนวณ exitTime ใหม่จาก loadDoneTime + เวลาทำเอกสารตัวล่าสุด แล้วเขียนทับให้ตรงกันทันทีที่ Master Setting ถูกบันทึก
+const recomputeQueueExitTimes = async (docMins) => {
+  try {
+    const { data, error } = await supabase.from("wh_queue").select("*");
+    if (!error && data) {
+      const updates = data
+        .map(row => {
+          const q = row.data;
+          if (!q?.loadDoneTime) return null;
+          const exitTime = addMinutesToHHMM(q.loadDoneTime, docMins);
+          return exitTime === q.exitTime ? null : { id: row.id, data: { ...q, exitTime } };
+        })
+        .filter(Boolean);
+      if (updates.length) await supabase.from("wh_queue").upsert(updates);
+    }
+
+    const { data: pendingRow } = await supabase.from("wh_master").select("*").eq("id", "pending_queue").single();
+    const pending = pendingRow?.data;
+    if (Array.isArray(pending?.rows) && pending.rows.length) {
+      const newRows = pending.rows.map(q => q.loadDoneTime ? { ...q, exitTime: addMinutesToHHMM(q.loadDoneTime, docMins) } : q);
+      await supabase.from("wh_master").upsert({ id: "pending_queue", data: { ...pending, rows: newRows } });
+    }
+  } catch (e) {
+    console.error("recomputeQueueExitTimes ไม่สำเร็จ:", e);
+  }
+};
+
 // ถ้า exitTime อยู่ก่อนเวลาตัดรอบวันทำงาน (settings.workDayCutoffHour) → วันที่จริงคือ dateStr + 1 (กะข้ามคืน)
 const displayDate = (dateStr, exitTime) => {
   if (!dateStr || !exitTime) return dateStr || "";
@@ -4054,6 +4083,7 @@ const SystemSettings = () => {
         saveSetting("doc_time_minutes",         Number(form.docTimeMinutes)),
         saveSetting("excluded_customer_groups", form.excludedCustomerGroups.split(",").map(s => s.trim()).filter(Boolean)),
       ]);
+      await recomputeQueueExitTimes(Number(form.docTimeMinutes));
       setMsg("✅ บันทึกการตั้งค่าสำเร็จ — มีผลทันทีในเซสชันนี้ เครื่องอื่นต้องรีเฟรชหน้าถึงจะเห็นค่าใหม่");
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
