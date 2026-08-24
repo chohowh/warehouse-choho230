@@ -1567,6 +1567,15 @@ const toHHMM = (val) => {
   return String(val);
 };
 
+// เวลาออกจากโรงงาน = เวลาโหลดเสร็จ (ค่าที่อ่านจากไฟล์ Excel) + เวลาทำเอกสาร (settings.docTimeMinutes, ปรับได้ที่หน้าตั้งค่าระบบ)
+const addMinutesToHHMM = (hhmm, mins) => {
+  if (!hhmm) return "";
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return hhmm;
+  const total = ((parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + Number(mins || 0)) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+};
+
 // ถ้า exitTime อยู่ก่อนเวลาตัดรอบวันทำงาน (settings.workDayCutoffHour) → วันที่จริงคือ dateStr + 1 (กะข้ามคืน)
 const displayDate = (dateStr, exitTime) => {
   if (!dateStr || !exitTime) return dateStr || "";
@@ -1595,16 +1604,17 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
   const [editData, setEditData] = useState({});
 
   const [addingManual, setAddingManual] = useState(false);
-  const [manualData, setManualData] = useState({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
+  const [manualData, setManualData] = useState({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", loadDoneTime: "" });
   const [searchQuery, setSearchQuery] = useState("");
 
   const [queueSaving, setQueueSaving] = useState(false);
-  const startEdit = (q) => { setEditId(q.id); setEditData({ plate: q.plate, customerGroup: q.customerGroup, zone: q.zone || "", entryTime: q.entryTime, exitTime: q.exitTime }); };
+  const startEdit = (q) => { setEditId(q.id); setEditData({ plate: q.plate, customerGroup: q.customerGroup, zone: q.zone || "", entryTime: q.entryTime, loadDoneTime: q.loadDoneTime || "" }); };
   const cancelEdit = () => { setEditId(null); setEditData({}); };
   const saveEdit = async () => {
     setQueueSaving(true);
     try {
-      await onSetQueue(queue.map(q => q.id === editId ? { ...q, ...editData, zone: editData.zone, time: editData.entryTime } : q));
+      const exitTime = addMinutesToHHMM(editData.loadDoneTime, settings.docTimeMinutes);
+      await onSetQueue(queue.map(q => q.id === editId ? { ...q, ...editData, zone: editData.zone, time: editData.entryTime, exitTime } : q));
       setEditId(null); setEditData({});
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
@@ -1627,8 +1637,9 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
     if (!manualData.plate) return;
     setQueueSaving(true);
     try {
-      await onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, date: manualData.date || SHORT_DATE(), time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
-      setManualData({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", exitTime: "" });
+      const exitTime = addMinutesToHHMM(manualData.loadDoneTime, settings.docTimeMinutes);
+      await onSetQueue([...queue, { id: `M${Date.now()}`, ...manualData, exitTime, date: manualData.date || SHORT_DATE(), time: manualData.entryTime, driver: "", zone: manualData.zone || "", product: "", destination: "", qty: 0, unit: "กก.", loadTime: "" }]);
+      setManualData({ date: "", plate: "", customerGroup: "", zone: "", entryTime: "", loadDoneTime: "" });
       setAddingManual(false);
     } catch (e) {
       alert("บันทึกไม่สำเร็จ: " + e.message);
@@ -1660,13 +1671,15 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
           const row = rows[i];
           const plate = String(row[LG_UPLOAD_COLS.plate] ?? "").trim();
           if (!plate) continue;
+          const loadDoneTime = toHHMM(row[LG_UPLOAD_COLS.exitTime]);
           trucks.push({
             date:          toDateStr(row[LG_UPLOAD_COLS.date]),
             plate,
             customerGroup: String(row[LG_UPLOAD_COLS.customerGroup] ?? "").trim(),
             zone:          String(row[LG_UPLOAD_COLS.zone] ?? "").trim(),
             entryTime:     toHHMM(row[LG_UPLOAD_COLS.entryTime]),
-            exitTime:      toHHMM(row[LG_UPLOAD_COLS.exitTime]),
+            loadDoneTime,
+            exitTime:      addMinutesToHHMM(loadDoneTime, settings.docTimeMinutes),
           });
         }
 
@@ -1697,6 +1710,7 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
       time:          t.entryTime    || "",
       entryTime:     t.entryTime    || "",
       loadTime:      t.loadTime     || "",
+      loadDoneTime:  t.loadDoneTime || "",
       exitTime:      t.exitTime     || "",
     }));
     setStatus("uploading");
@@ -1805,7 +1819,7 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 11 : 12 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา"] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน"]).map(h => (
+                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา"] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาโหลดเสร็จ","เวลาออกจากโรงงาน"]).map(h => (
                     <th key={h} style={{ padding: isMobile ? "6px 6px" : "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
                   ))}
                 </tr>
@@ -1821,6 +1835,7 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                     <td style={{ padding: "6px 6px", fontWeight: 700, color: "#7c3aed" }}>{t.zone}</td>
                     <td style={{ padding: "6px 6px" }}>
                       <div style={{ fontWeight: 700, color: "#3b82f6" }}>{t.entryTime}</div>
+                      <div style={{ fontWeight: 700, color: "#9ca3af" }}>{t.loadDoneTime}</div>
                       <div style={{ fontWeight: 700, color: "#6b7280" }}>{t.exitTime}</div>
                     </td>
                   </tr>
@@ -1831,6 +1846,7 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                     <td style={{ padding: "8px 12px" }}>{t.customerGroup}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 700, color: "#7c3aed" }}>{t.zone}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 700, color: "#3b82f6" }}>{t.entryTime}</td>
+                    <td style={{ padding: "8px 12px", fontWeight: 700, color: "#9ca3af" }}>{t.loadDoneTime}</td>
                     <td style={{ padding: "8px 12px", fontWeight: 700, color: "#6b7280" }}>{t.exitTime}</td>
                   </tr>
                 ))}
@@ -1870,7 +1886,7 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 11 : 12 }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา",""] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาออกจากโรงงาน",""]).map(h => (
+                  {(isMobile ? ["ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลา",""] : ["วันที่","ทะเบียนรถ","กลุ่มลูกค้า","Zone","เวลาเข้าโรงงาน","เวลาโหลดเสร็จ","เวลาออกจากโรงงาน",""]).map(h => (
                     <th key={h} style={{ padding: isMobile ? "6px 6px" : "8px 12px", textAlign: "left", fontWeight: 700, color: "#374151", whiteSpace: "nowrap", borderBottom: "1px solid #e5e7eb" }}>{h}</th>
                   ))}
                 </tr>
@@ -1910,10 +1926,12 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                         {isEditing
                           ? <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                               <input style={inputStyle} value={editData.entryTime} placeholder="เข้า HH:MM" onChange={e => setEditData(d => ({ ...d, entryTime: e.target.value }))} />
-                              <input style={inputStyle} value={editData.exitTime} placeholder="ออก HH:MM" onChange={e => setEditData(d => ({ ...d, exitTime: e.target.value }))} />
+                              <input style={inputStyle} value={editData.loadDoneTime} placeholder="โหลดเสร็จ HH:MM" onChange={e => setEditData(d => ({ ...d, loadDoneTime: e.target.value }))} />
+                              <div style={{ fontSize: 10, color: "#9ca3af" }}>ออก: {addMinutesToHHMM(editData.loadDoneTime, settings.docTimeMinutes) || "–"}</div>
                             </div>
                           : <>
                               <div style={{ fontWeight: 700, color: "#3b82f6" }}>{q.entryTime}</div>
+                              <div style={{ fontWeight: 700, color: "#9ca3af" }}>{q.loadDoneTime}</div>
                               <div style={{ fontWeight: 700, color: "#6b7280" }}>{q.exitTime}</div>
                             </>}
                       </td>
@@ -1942,9 +1960,14 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                           ? <input style={inputStyle} value={editData.entryTime} placeholder="HH:MM" onChange={e => setEditData(d => ({ ...d, entryTime: e.target.value }))} />
                           : q.entryTime}
                       </td>
+                      <td style={{ padding: "8px 12px", fontWeight: 700, color: "#9ca3af" }}>
+                        {isEditing
+                          ? <input style={inputStyle} value={editData.loadDoneTime} placeholder="HH:MM" onChange={e => setEditData(d => ({ ...d, loadDoneTime: e.target.value }))} />
+                          : q.loadDoneTime}
+                      </td>
                       <td style={{ padding: "8px 12px", fontWeight: 700, color: "#6b7280" }}>
                         {isEditing
-                          ? <input style={inputStyle} value={editData.exitTime} placeholder="HH:MM" onChange={e => setEditData(d => ({ ...d, exitTime: e.target.value }))} />
+                          ? (addMinutesToHHMM(editData.loadDoneTime, settings.docTimeMinutes) || "–")
                           : q.exitTime}
                       </td>
                       <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}>{actions}</td>
@@ -1962,7 +1985,8 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                     <td style={{ padding: "6px 6px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         <input style={inputStyle} placeholder="เข้า HH:MM" value={manualData.entryTime} onChange={e => setManualData(d => ({ ...d, entryTime: e.target.value }))} />
-                        <input style={inputStyle} placeholder="ออก HH:MM" value={manualData.exitTime} onChange={e => setManualData(d => ({ ...d, exitTime: e.target.value }))} />
+                        <input style={inputStyle} placeholder="โหลดเสร็จ HH:MM" value={manualData.loadDoneTime} onChange={e => setManualData(d => ({ ...d, loadDoneTime: e.target.value }))} />
+                        <div style={{ fontSize: 10, color: "#9ca3af" }}>ออก: {addMinutesToHHMM(manualData.loadDoneTime, settings.docTimeMinutes) || "–"}</div>
                       </div>
                     </td>
                     <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
@@ -1979,7 +2003,8 @@ const LGUpload = ({ queue, onSetQueue, pendingQueue, onSetPendingQueue, onClearP
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="กลุ่มลูกค้า" value={manualData.customerGroup} onChange={e => setManualData(d => ({ ...d, customerGroup: e.target.value }))} /></td>
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="Zone" value={manualData.zone} onChange={e => setManualData(d => ({ ...d, zone: e.target.value }))} /></td>
                     <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="HH:MM" value={manualData.entryTime} onChange={e => setManualData(d => ({ ...d, entryTime: e.target.value }))} /></td>
-                    <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="HH:MM" value={manualData.exitTime} onChange={e => setManualData(d => ({ ...d, exitTime: e.target.value }))} /></td>
+                    <td style={{ padding: "6px 8px" }}><input style={inputStyle} placeholder="HH:MM" value={manualData.loadDoneTime} onChange={e => setManualData(d => ({ ...d, loadDoneTime: e.target.value }))} /></td>
+                    <td style={{ padding: "6px 8px", color: "#9ca3af" }}>{addMinutesToHHMM(manualData.loadDoneTime, settings.docTimeMinutes) || "–"}</td>
                     <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
                         <button onClick={saveManual} disabled={queueSaving} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 0, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{queueSaving ? "..." : "บันทึก"}</button>
@@ -3969,6 +3994,7 @@ const SystemSettings = () => {
     unitPrice:               settings.unitPrice,
     vatRate:                 settings.vatRate,
     exitTimeWindowMinutes:   settings.exitTimeWindowMinutes,
+    docTimeMinutes:          settings.docTimeMinutes,
     excludedCustomerGroups:  settings.excludedCustomerGroups.join(", "),
   });
   const [saving, setSaving] = useState(false);
@@ -4003,6 +4029,8 @@ const SystemSettings = () => {
       return "อัตรา VAT ต้องไม่ติดลบ";
     if (!Number.isFinite(n(form.exitTimeWindowMinutes)) || n(form.exitTimeWindowMinutes) <= 0)
       return "ช่วงเวลานับถอยหลังก่อนออกโรงงานต้องมากกว่า 0";
+    if (!Number.isFinite(n(form.docTimeMinutes)) || n(form.docTimeMinutes) < 0)
+      return "เวลาทำเอกสารต้องไม่ติดลบ";
     return "";
   };
 
@@ -4023,6 +4051,7 @@ const SystemSettings = () => {
         saveSetting("unit_price",               Number(form.unitPrice)),
         saveSetting("vat_rate",                 Number(form.vatRate)),
         saveSetting("exit_time_window_minutes", Number(form.exitTimeWindowMinutes)),
+        saveSetting("doc_time_minutes",         Number(form.docTimeMinutes)),
         saveSetting("excluded_customer_groups", form.excludedCustomerGroups.split(",").map(s => s.trim()).filter(Boolean)),
       ]);
       setMsg("✅ บันทึกการตั้งค่าสำเร็จ — มีผลทันทีในเซสชันนี้ เครื่องอื่นต้องรีเฟรชหน้าถึงจะเห็นค่าใหม่");
@@ -4097,6 +4126,10 @@ const SystemSettings = () => {
         <div>
           <label style={lbl}>ช่วงเวลานับถอยหลังก่อนออกโรงงาน (นาที)</label>
           <input type="number" min="1" value={form.exitTimeWindowMinutes} onChange={set("exitTimeWindowMinutes")} style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>เวลาทำเอกสารหลังโหลดเสร็จ (นาที)</label>
+          <input type="number" min="0" value={form.docTimeMinutes} onChange={set("docTimeMinutes")} style={inp} />
         </div>
         <div>
           <label style={lbl}>กลุ่มลูกค้าที่ยกเว้นจาก Dashboard/คิว (คั่นด้วย ,)</label>
