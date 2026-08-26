@@ -1022,6 +1022,33 @@ const PhotoUploader = ({ label, value, onChange, onRemove }) => {
   );
 };
 
+// ─── ชื่อผู้ปฏิบัติงาน (จำชื่อล่าสุดไว้ต่อบทบาทผ่าน localStorage) ────────────────
+const OPERATOR_NAME_KEYS = { yard: "wh_operator_yard", qc: "wh_operator_qc", checker: "wh_operator_checker" };
+
+const usePersistedOperatorName = (key) => {
+  const [name, setName] = useState(() => { try { return localStorage.getItem(key) || ""; } catch { return ""; } });
+  const update = val => {
+    setName(val);
+    try { localStorage.setItem(key, val); } catch {}
+  };
+  return [name, update];
+};
+
+const OperatorNameInput = ({ value, onChange, borderColor = "#e5e7eb", roleLabel }) => (
+  <div style={{ marginBottom: 12 }}>
+    <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 5 }}>
+      ชื่อผู้ปฏิบัติงาน{roleLabel ? ` (${roleLabel})` : ""}
+    </label>
+    <input
+      type="text"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder="ชื่อผู้ปฏิบัติงาน"
+      style={{ width: "100%", border: `1.5px solid ${borderColor}`, borderRadius: 0, padding: "10px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+    />
+  </div>
+);
+
 // ─── TRUCK CARD ───────────────────────────────────────────────────────────────
 const TruckCard = ({ t, children, highlight }) => (
   <div style={{ background: "#fff", borderRadius: 0, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", marginBottom: 14, border: highlight ? "2px solid #111" : "1.5px solid #f0f0f0" }}>
@@ -2501,6 +2528,7 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, onBack }) => {
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [bayId,     setBayId]     = useState(null);
+  const [operatorName, setOperatorName] = usePersistedOperatorName(OPERATOR_NAME_KEYS.yard);
 
   // รับทุกรถที่สถานะ "picking" (พิมพ์เบิกแล้ว)
   const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
@@ -2524,11 +2552,11 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, onBack }) => {
   };
 
   const handleSubmit = async () => {
-    if (!sel || !temp || uploading) return;
+    if (!sel || !temp || !operatorName.trim() || uploading) return;
     setUploading(true);
     try {
       const photoUrls = await uploadPhotos(`qc`, sel.plate, Array.isArray(photo) ? photo : (photo ? [photo] : []));
-      const qcLanes = { ...(sel.qcLanes || {}), [lane]: { done: true, temp, photos: photoUrls, doneAt: TIME_NOW(), bayId: bay?.id || null } };
+      const qcLanes = { ...(sel.qcLanes || {}), [lane]: { done: true, temp, photos: photoUrls, doneAt: TIME_NOW(), bayId: bay?.id || null, operatorName: operatorName.trim() } };
       await onUpdate(sel.id, { qcLanes });
       setFlashLane(lane); setTemp(""); setPhoto(null);
       setTimeout(() => setFlashLane(null), 2500);
@@ -2614,11 +2642,12 @@ const QC = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, onBack }) => {
         <input value={temp} onChange={e => setTemp(e.target.value)} type="number" placeholder="-4"
           style={{ width: "100%", border: `2px solid ${actLane.border}`, borderRadius: 0, padding: "12px 14px", fontSize: 26, fontWeight: 900, outline: "none", boxSizing: "border-box", color: actLane.color, background: "#fff", textAlign: "center", marginBottom: 12 }} />
         <PhotoUploader label="📷 ถ่ายรูปอุณหภูมิ" value={photo} onChange={handlePhoto} onRemove={setPhoto} />
+        <OperatorNameInput value={operatorName} onChange={setOperatorName} borderColor={actLane.border} roleLabel="ลานโหลด" />
       </div>
 
-      <button onClick={handleSubmit} disabled={!sel || !temp || uploading}
-        style={{ width: "100%", background: sel && temp && !uploading ? actLane.color : "#e5e7eb", color: sel && temp && !uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: sel && temp && !uploading ? "pointer" : "default", marginBottom: 20 }}>
-        {uploading ? "⏳ กำลังอัพโหลดรูป..." : !sel ? "เลือกทะเบียนรถก่อน" : !temp ? "กรอกอุณหภูมิก่อน" : `✅ บันทึก QC → ${actLane.label}`}
+      <button onClick={handleSubmit} disabled={!sel || !temp || !operatorName.trim() || uploading}
+        style={{ width: "100%", background: sel && temp && operatorName.trim() && !uploading ? actLane.color : "#e5e7eb", color: sel && temp && operatorName.trim() && !uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: sel && temp && operatorName.trim() && !uploading ? "pointer" : "default", marginBottom: 20 }}>
+        {uploading ? "⏳ กำลังอัพโหลดรูป..." : !sel ? "เลือกทะเบียนรถก่อน" : !temp ? "กรอกอุณหภูมิก่อน" : !operatorName.trim() ? "กรอกชื่อผู้ปฏิบัติงานก่อน" : `✅ บันทึก QC → ${actLane.label}`}
       </button>
 
     </div>
@@ -2634,6 +2663,7 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, 
   const [flashLane, setFlashLane] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [bayId,     setBayId]     = useState(null);
+  const [operatorName, setOperatorName] = usePersistedOperatorName(OPERATOR_NAME_KEYS.qc);
 
   const eligible = trucks.filter(t => ["arrived", "picking"].includes(t.status) && !settings.excludedCustomerGroups.includes(t.customerGroup));
   const sel      = trucks.find(t => t.id === selId) || null;
@@ -2657,11 +2687,11 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, 
   };
 
   const handleSubmit = async () => {
-    if (!sel || !photos.length || uploading) return;
+    if (!sel || !photos.length || !operatorName.trim() || uploading) return;
     setUploading(true);
     try {
       const photoUrls = await uploadPhotos(`sample`, sel.plate, photos);
-      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW(), bayId: bay?.id || null } };
+      const sampleLanes = { ...(sel.sampleLanes || {}), [lane]: { done: true, photos: photoUrls, note, doneAt: TIME_NOW(), bayId: bay?.id || null, operatorName: operatorName.trim() } };
       await onUpdate(sel.id, { sampleLanes });
       setFlashLane(lane); setPhoto(null); setNote("");
       setTimeout(() => setFlashLane(null), 2500);
@@ -2749,11 +2779,12 @@ const RandomSampleCheck = ({ trucks, onUpdate, laneId, detailMapByChannel = {}, 
           style={{ width: "100%", border: `1.5px solid ${actLane.border}`, borderRadius: 0, padding: "10px 12px", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
         />
         <PhotoUploader label="📷 ถ่ายรูปอุณหภูมิ" value={photo} onChange={handlePhoto} onRemove={setPhoto} />
+        <OperatorNameInput value={operatorName} onChange={setOperatorName} borderColor={actLane.border} roleLabel="QC" />
       </div>
 
-      <button onClick={handleSubmit} disabled={!sel || !photos.length || uploading}
-        style={{ width: "100%", background: sel && photos.length && !uploading ? actLane.color : "#e5e7eb", color: sel && photos.length && !uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: sel && photos.length && !uploading ? "pointer" : "default", marginBottom: 20 }}>
-        {uploading ? "⏳ กำลังอัพโหลดรูป..." : !sel ? "เลือกทะเบียนรถก่อน" : !photos.length ? "แนบรูปก่อน" : `✅ บันทึกตรวจ → ${actLane.label}`}
+      <button onClick={handleSubmit} disabled={!sel || !photos.length || !operatorName.trim() || uploading}
+        style={{ width: "100%", background: sel && photos.length && operatorName.trim() && !uploading ? actLane.color : "#e5e7eb", color: sel && photos.length && operatorName.trim() && !uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "14px 0", fontWeight: 700, fontSize: 15, cursor: sel && photos.length && operatorName.trim() && !uploading ? "pointer" : "default", marginBottom: 20 }}>
+        {uploading ? "⏳ กำลังอัพโหลดรูป..." : !sel ? "เลือกทะเบียนรถก่อน" : !photos.length ? "แนบรูปก่อน" : !operatorName.trim() ? "กรอกชื่อผู้ปฏิบัติงานก่อน" : `✅ บันทึกตรวจ → ${actLane.label}`}
       </button>
 
     </div>
@@ -2783,6 +2814,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
   const addReasonField = () => setWaitingReasons(rs => rs.length >= MAX_WAITING_REASONS ? rs : [...rs, ""]);
   const removeReasonField = (idx) => setWaitingReasons(rs => rs.length <= 1 ? rs : rs.filter((_, i) => i !== idx));
   const bay = settings.enableBaySelection ? bays.find(b => b.id === bayId) : null;
+  const [operatorName, setOperatorName] = usePersistedOperatorName(OPERATOR_NAME_KEYS.checker);
 
   if (settings.enableBaySelection && !bayId) {
     return <BaySelect laneId={activeLane} actLane={curLane} title={`Checker ${curLane.label}`} onSelect={setBayId} onBack={onBack} />;
@@ -2822,18 +2854,18 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
   };
 
   const openWaitingModal = () => {
-    if (!sel || form.uploading) return;
+    if (!sel || !operatorName.trim() || form.uploading) return;
     setWaitingReasons([""]);
     setWaitingModal(true);
   };
 
   const confirmWaiting = async () => {
     const combinedReason = waitingReasons.map(r => r.trim()).filter(Boolean).join(", ");
-    if (!sel || form.uploading || !combinedReason) return;
+    if (!sel || !operatorName.trim() || form.uploading || !combinedReason) return;
     setWaitingModal(false);
     setF(activeLane, { uploading: true });
     try {
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), waitingFor: combinedReason, note: form.note, bayId: bay?.id || null } };
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...(sel.loadLanes?.[activeLane] || {}), waiting: true, waitingAt: TIME_NOW(), waitingFor: combinedReason, note: form.note, bayId: bay?.id || null, operatorName: operatorName.trim() } };
       await onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", uploading: false, baskets: emptyBaskets() });
     } catch (e) {
@@ -2843,7 +2875,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
   };
 
   const handleLoad = async () => {
-    if (!sel || form.uploading) return;
+    if (!sel || !operatorName.trim() || form.uploading) return;
     if (!window.confirm(`ยืนยัน: บันทึกโหลดเสร็จ ${sel.plate}?`)) return;
     setF(activeLane, { uploading: true });
     try {
@@ -2852,7 +2884,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
       const existing = sel.loadLanes?.[activeLane] || {};
       const baskets = Object.fromEntries(basketTypes.map(b => [b.key, Number(form.baskets?.[b.key]) || 0]));
       const basketPayer = (form.baskets?.payer || "").trim();
-      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer, bayId: bay?.id || null } };
+      const loadLanes = { ...(sel.loadLanes || {}), [activeLane]: { ...existing, done: true, photos: photoUrls, note: form.note, doneAt: TIME_NOW(), baskets, basketPayer, bayId: bay?.id || null, operatorName: operatorName.trim() } };
       await onUpdate(sel.id, { loadLanes });
       setF(activeLane, { selId: "", photo: null, note: "", flash: true, uploading: false, baskets: emptyBaskets() });
       setTimeout(() => setF(activeLane, { flash: false }), 2500);
@@ -2926,6 +2958,7 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
           style={{ width: "100%", border: `1.5px solid ${curLane.border}`, borderRadius: 0, padding: "10px 12px", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
         />
         <PhotoUploader label="📷 ถ่ายรูปหลังโหลดเสร็จ" value={form.photo} onChange={handlePhoto(activeLane)} onRemove={photos => setF(activeLane, { photo: photos })} />
+        <OperatorNameInput value={operatorName} onChange={setOperatorName} borderColor={curLane.border} roleLabel="Checker" />
 
         <div style={{ marginTop: 4, marginBottom: 12 }}>
           <div onClick={() => setBasketsOpen(o => !o)}
@@ -2958,13 +2991,13 @@ const LoadingYard = ({ trucks, onUpdate, laneId, masterLane = [], onBack }) => {
           )}
         </div>
 
-        <button onClick={openWaitingModal} disabled={!sel || form.uploading}
-          style={{ width: "100%", background: sel && !form.uploading ? "#f59e0b" : "#e5e7eb", color: sel && !form.uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: sel && !form.uploading ? "pointer" : "default", marginBottom: 8 }}>
-          ⏳ รอเติมสินค้า
+        <button onClick={openWaitingModal} disabled={!sel || !operatorName.trim() || form.uploading}
+          style={{ width: "100%", background: sel && operatorName.trim() && !form.uploading ? "#f59e0b" : "#e5e7eb", color: sel && operatorName.trim() && !form.uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: sel && operatorName.trim() && !form.uploading ? "pointer" : "default", marginBottom: 8 }}>
+          {!sel ? "เลือกทะเบียนรถก่อน" : !operatorName.trim() ? "กรอกชื่อผู้ปฏิบัติงานก่อน" : "⏳ รอเติมสินค้า"}
         </button>
-        <button onClick={handleLoad} disabled={!sel || form.uploading}
-          style={{ width: "100%", background: sel && !form.uploading ? curLane.color : "#e5e7eb", color: sel && !form.uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: sel && !form.uploading ? "pointer" : "default" }}>
-          {form.uploading ? "⏳ กำลังอัพโหลดรูป..." : "✅ บันทึกโหลดเสร็จ"}
+        <button onClick={handleLoad} disabled={!sel || !operatorName.trim() || form.uploading}
+          style={{ width: "100%", background: sel && operatorName.trim() && !form.uploading ? curLane.color : "#e5e7eb", color: sel && operatorName.trim() && !form.uploading ? "#fff" : "#9ca3af", border: "none", borderRadius: 0, padding: "13px 0", fontWeight: 700, fontSize: 15, cursor: sel && operatorName.trim() && !form.uploading ? "pointer" : "default" }}>
+          {form.uploading ? "⏳ กำลังอัพโหลดรูป..." : !sel ? "เลือกทะเบียนรถก่อน" : !operatorName.trim() ? "กรอกชื่อผู้ปฏิบัติงานก่อน" : "✅ บันทึกโหลดเสร็จ"}
         </button>
       </div>
 
@@ -3092,6 +3125,7 @@ const buildLaneEvents = (list, sources) => {
             photos: ld.photos || [],
             doneLabel: src.doneLabel,
             note: src.field === "qcLanes" ? (ld.temp != null ? `${ld.temp}°C` : "") : ld.note,
+            operatorName: ld.operatorName || "",
           });
         }
       }
@@ -3132,7 +3166,8 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
     const matchesExtra = !extraQuery
       || ev.zone?.toLowerCase().includes(extraQuery)
       || ev.customerGroup?.toLowerCase().includes(extraQuery)
-      || ev.note?.toLowerCase().includes(extraQuery);
+      || ev.note?.toLowerCase().includes(extraQuery)
+      || ev.operatorName?.toLowerCase().includes(extraQuery);
     return matchesPlate && matchesExtra;
   });
 
@@ -3199,6 +3234,7 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
           "จุดจอด": ev.bayLabel || "",
           "รายการ": ev.doneLabel,
           "หมายเหตุ": ev.note || "",
+          "ผู้ปฏิบัติงาน": ev.operatorName || "",
           "เวลา": formatLogTime(ev.doneAt, date),
         });
       }
@@ -3264,6 +3300,7 @@ const EventLog = ({ trucks, title, emptyMsg }) => {
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{formatLogTime(ev.doneAt, date)}</span>
               </div>
               {ev.note && <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>{ev.note}</div>}
+              {ev.operatorName && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>👤 {ev.operatorName}</div>}
               {ev.photos.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 64 : 80}px, 1fr))`, gap: 6 }}>
                   {ev.photos.map((url, idx) => (
